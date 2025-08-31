@@ -13,7 +13,9 @@ from torch.utils.data.distributed import DistributedSampler
 from transformers import AutoTokenizer
 import sys
 sys.path.append("/home/ldap-users/s2220411/Code/new_explore_multimodel/LlamaGen")
-from autoregressive.models.gpt import GPT_XXL_speech, GPT_Small_speech, GPT_XL, MultiTaskImageSpeech
+# from autoregressive.models.gpt import GPT_XXL_speech, GPT_Small_speech, GPT_XL, MultiTaskImageSpeech
+from autoregressive.models.gpt_cosy import GPT_XXL_speech, GPT_Small_speech, GPT_XL, MultiTaskImageSpeech
+
 
 from transformers.optimization import get_linear_schedule_with_warmup
 from collections import deque
