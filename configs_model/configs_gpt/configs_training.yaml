@@ -1,0 +1,120 @@
+model:
+  name: ""
+tokenizer:
+  name: ""
+
+custom_data:
+  pad_token: -100 # -100 for mBART, loss will ignore these tokens
+  ignore_token: -100 # -100 for mBART, loss will ignore these tokens
+  bos_tts:
+    "English": 1000
+  eos_tts: 1001
+  bos_asr:
+    "English": 1000
+  eos_asr: 1001
+  padding_eos: 0 # default of Qwen tokenizer
+
+task_training:
+  ASR: false
+  TTS: true
+loss_target: TTS # TTS, ASR, or TTS_ASR
+dataset:
+  path_dir:
+    - "/home/ldap-users/s2220411/Code/new_explore_tts/MachineSpeechChain_ASRU25/dataset/LibriTTS"
+  langs:
+    - "English"
+  train_files:
+    - "train.json"
+    #- "train-clean-100.json"
+    #- "train-clean-360.json"
+    #- "train-other-500.json"
+  dev_files:
+    - "dev.json"
+  train_samples: 100000000 # 500, 1000, 2000, 3000
+  dev_samples: 100000000 # 100000 # 500, 1000, 2000, 3000
+
+preprocessing:
+  max_length_unit: 600 # 700
+  max_length_text: 60
+  remove_consecutive_duplicates: true
+
+training:
+  num_workers: 6 # Number of workers for DataLoader
+  evaluation_strategy: "epoch"
+  learning_rate: 1e-4
+  output_dir: !ref "result/TTS_result/ImageSpeechGeneration_Final/LibriTTS_1e4_4Layer_16alpha_16rank"
+  per_device_train_batch_size: 8 #32 #10 #8 #16 #32 # 32
+  per_device_eval_batch_size: 8 #32 #10 #8 #16 #32 # 32
+  num_train_epochs: 1000
+  weight_decay: 0.01 # 0.01, 0.1, 0.3
+  fp16: true
+  save_strategy: "epoch"
+  logging_steps: 50
+  logging_strategy: "steps"
+  report_to: ["tensorboard"]
+  metric_for_best_model: "eval_loss"
+  greater_is_better: false
+  save_total_limit: 3
+  ddp_find_unused_parameters: false  # Uncomment if using DDP
+  lr_scheduler_type: "constant" # "linear", "cosine", "cosine_with_restarts", "polynomial", "constant", "constant_with_warmup"
+  label_smoothing_factor: 0.1
+  #adam_beta1: 0.9
+  #adam_beta2: 0.98
+  #adam_epsilon: 1e-6
+  early_stopping: false
+  save_iterations: 2500 # 200 #5000 #10000 #1000
+  keep_last_n_checkpoints: 5
+  early_stopping_patience: 5
+
+model_config:
+  vocab_size: 32100
+  image_size: 512
+  hidden_size: 512
+  downsample_size: 16
+  num_hidden_layers: 12
+  num_attention_heads: 8
+  cls_token_num: 120
+  dropout_p: 0.1
+  token_dropout_p: 0.1
+  image_backbone_tuning_mode: 'lora' # finetune, lora, frozen
+  lora_alpha: 16.0
+  lora_rank: 16
+image_config:
+  vocab_size: 16384
+  gpt_type: t2i
+  cls_token_num: 120
+speech_config:
+  text_vocab_size: 32100
+  vocab_speech_size: 1002
+  hidden_size: 512
+  n_speech_extra_layers: 4
+  freeze_image_backbone: True
+
+
+tts_decoder_mbart:
+  use_tts_decoder: false
+  use_tts_postnet: false
+
+inference:
+  max_length_unit: 500 # 700
+  max_length_text: 60
+  num_beams: 5
+
+inference_gradtts:
+  n_timesteps: 10
+  checkpoint: !ref "/home/ldap-users/s2220411/Code/new_explore_tts/Speech-Backbones/Grad-TTS/logs/CSS10_1K"
+  hifi_gan_config: '/home/ldap-users/s2220411/Code/new_explore_tts/Speech-Backbones/Grad-TTS/checkpts/hifigan-config.json'
+  hifi_gan_checkpoint: '/home/ldap-users/s2220411/Code/new_explore_tts/Speech-Backbones/Grad-TTS/checkpts/hifigan.pt'
+  vocab: 1001
+
+debug:
+  train_samples: 1000
+  dev_samples: 100
+  save_iterations: 10
+
+finetune_specific_lang: false
+self_paced_learning: true
+self_paced_learning_config:
+  lamda_threshold: 5
+  threshold_increment: 0.1
+  iteration_increment: 200
