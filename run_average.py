@@ -29,8 +29,8 @@ def average_model_weights(models_or_paths):
             avg[k] = v0
     return avg
 
-path_folder="/home/ldap-users/s2220411/Code/new_explore_multimodel/LlamaGen/result/TTS_result/ImageSpeechGeneration_Final"
-folder_name="LibriTTS_1e4_2Layer_16alpha_16rank"
+path_folder="/home/ldap-users/s2220411/Code/new_explore_multimodel/LlamaGen/result/TTS_result/ImageSpeechGeneration_Final_Cosyvoce"
+folder_name="LibriTTS_1e4_2Layer_16alpha_16rank_BS14"
 # Load models
 model_names = glob.glob(f"{path_folder}/{folder_name}/checkpoint_iter_*")
 # sort by iteration

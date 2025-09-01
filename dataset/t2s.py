@@ -119,7 +119,7 @@ class DatasetT2S(Dataset):
         return len(self.data)
 
     def processing_label(self, tokens):
-        processed_tokens = remove_duplicates(tokens)
+        processed_tokens = remove_duplicates(tokens, remove_consecutive=False)
         # Convert list of strings to int
         for i in range(len(processed_tokens)):
             processed_tokens[i] = int(processed_tokens[i])

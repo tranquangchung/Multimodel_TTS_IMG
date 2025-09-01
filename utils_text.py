@@ -48,7 +48,10 @@ def load_config(config_path):
         config = load_hyperpyyaml(file)
     return config
 
-def remove_duplicates(sequence):
+def remove_duplicates(sequence, remove_consecutive=True):
     numbers = sequence.split()
-    distinct_numbers = [numbers[i] for i in range(len(numbers)) if i == 0 or numbers[i] != numbers[i - 1]]
-    return distinct_numbers
+    if remove_consecutive:
+        distinct_numbers = [numbers[i] for i in range(len(numbers)) if i == 0 or numbers[i] != numbers[i - 1]]
+        return distinct_numbers
+    else:
+        return numbers

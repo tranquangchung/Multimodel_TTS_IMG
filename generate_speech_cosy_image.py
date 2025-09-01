@@ -98,9 +98,9 @@ def evaluate_transcription(groundtruth, transcript_ars):
 
 
 def remove_consecutive_duplicates(number_sequence):
-    distinct_numbers = [number_sequence[i] for i in range(len(number_sequence)) if i == 0 or number_sequence[i] != number_sequence[i - 1]]
-    # remove token overrange 0->999
-    distinct_numbers = [x for x in distinct_numbers if int(x) < 1000]
+    # distinct_numbers = [number_sequence[i] for i in range(len(number_sequence)) if i == 0 or number_sequence[i] != number_sequence[i - 1]]
+    # remove token overrange 0-6560
+    distinct_numbers = [x for x in number_sequence if int(x) < 6561]
     return distinct_numbers
 
 def get_mel(filepath):
@@ -177,41 +177,17 @@ def remove_special_characters(text):
 # ]
 
 text_sources = [
-    "A small rabbit hopped through the meadow after the rain. Its ears twitched at every sound, and its fur was still damp.",
-    "A young bear sat by a stream, paws dipping into the cool water.",
+    "A small rabbit hopped through the meadow after the rain, its damp fur shining. Under a leaf, it sat still, listening with wonder.",
+    "An owl perched high on a branch as stars glowed above. Its bright eyes watched the dark path, wings ready to fly.",
+    "A turtle moved slowly along the shore, waves touching its shell. It carried peace within, unhurried toward the sea.",
+    "A gentle deer stood at the forest’s edge, golden fields stretching wide. Thin but strong, it breathed in the fading light.",
+    "A young bear sat by a stream, paws dipping into cool water. With bright eyes, it played as the forest hummed around it.",
+    "A cat stretched on the windowsill as rain tapped softly on the glass. Yawning, it curled into a ball, warm and safe.",
+    "A dog raced across the bright field, ears flying back. Stopping to sniff, it dashed forward again, chasing joy.",
+    "A tiny bird puffed its feathers against the breeze as the morning sky glowed. Tilting its head, it sang a clear note of hope.",
+    "A squirrel scurried along a branch, clutching an acorn tight. Without fear, it leapt to the next branch with ease.",
+    "A little hedgehog shuffled through dusk grass, leaving soft trails in the earth. When the breeze rustled, it curled slightly before moving on."
 ]
-
-# def generate_speech(model, tokenizer, text_source, device, configs, frontend, cosyvoice_model, lang=None, path2save_audio=None):
-#     spk = None
-#     tts_turn = configs['custom_data']['bos_tts'][lang]
-#     tts_eos = configs['custom_data']['eos_tts']
-#     print(f"{YELLOW}tts_turn: {tts_turn}, tts_eos: {tts_eos}{RESET}")
-#     text_source = remove_special_characters(text_source)
-#     encoded_inputs = tokenizer(text_source, return_tensors='pt', padding=True, truncation=True).to(device)
-#     encoded_inputs['input_ids'] = torch.cat(
-#         [encoded_inputs['input_ids'], torch.tensor([[tts_turn]], device='cuda:0')], dim=1)
-#     encoded_inputs['attention_mask'] = torch.cat(
-#         [encoded_inputs['attention_mask'], torch.tensor([[1]], device='cuda:0')], dim=1)
-#     encoded_inputs_length = encoded_inputs['input_ids'].shape[1]
-#     with torch.no_grad():
-#         outputs = model.speech_generate(
-#             encoded_inputs['input_ids'],
-#             max_new_tokens=config['inference']['max_length_unit'],
-#         )
-#         outputs = outputs.tolist()
-#         outputs = outputs[0][encoded_inputs_length:]
-#         print(outputs)
-#         print(f"{'text source (GT)'.ljust(20)}: {text_source}")
-#         predict_unit = remove_consecutive_duplicates(outputs)
-#         x = torch.IntTensor(predict_unit).cuda()[None]
-#         x_lengths = torch.LongTensor([x.shape[-1]]).to(device)
-#
-#         y_enc, y_dec, attn = generator.forward(x, x_lengths, n_timesteps=configs["inference_gradtts"]["n_timesteps"],
-#                                                temperature=1.5,
-#                                                stoc=False, spk=spk, length_scale=0.91)
-#         audio = (vocoder.forward(y_dec).cpu().squeeze().clamp(-1, 1).numpy() * 32768).astype(np.int16)
-#         if path2save_audio is not None:
-#             write(path2save_audio, 22050, audio)
 
 def generate_speech(
     model,
@@ -261,8 +237,8 @@ def generate_speech(
     outs = outs.tolist()[0][encoded_inputs_length:]  # cắt phần prompt
 
     # --- khử lặp + giới hạn vocab
-    # predict_unit = remove_consecutive_duplicates(outs)
-    predict_unit = outs
+    predict_unit = remove_consecutive_duplicates(outs)
+    # predict_unit = outs
     if len(predict_unit) == 0:
         print(f"{RED}predict_unit rỗng -> bỏ qua{RESET}")
         return
