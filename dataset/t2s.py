@@ -118,7 +118,7 @@ class DatasetT2S(Dataset):
     def __len__(self):
         return len(self.data)
 
-    def processing_label(self, tokens):
+    def processing_label(self, tokens, remove_consecutive=False):
         processed_tokens = remove_duplicates(tokens, remove_consecutive=False)
         # Convert list of strings to int
         for i in range(len(processed_tokens)):
@@ -153,8 +153,8 @@ class DatasetT2S(Dataset):
 
     def __getitem__(self, idx):
         item = self.data[idx]
-        source_text = remove_special_characters(item['transcript'])
-        # source_text = item['transcript']
+        # source_text = remove_special_characters(item['transcript'])
+        source_text = item['transcript']
         target_unit = item['unit']
         language_source = item['language']
         model_inputs = self.tokenizer(
@@ -167,7 +167,7 @@ class DatasetT2S(Dataset):
 
         text_token_len = model_inputs["attention_mask"].sum().item()
         text_task = model_inputs["input_ids"][0][:text_token_len].tolist()
-        unit_task = self.processing_label(target_unit)
+        unit_task = self.processing_label(target_unit, remove_consecutive=True)
 
         # TTS (text -> unit)
         bos_tts = self.bos_tts[self.languages_mapping_rev[language_source]]

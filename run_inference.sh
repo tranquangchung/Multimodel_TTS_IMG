@@ -11,6 +11,6 @@
 
 
 CUDA_VISIBLE_DEVICES=0 python -W ignore generate_speech_cosy_image.py \
-  --config result/TTS_result/ImageSpeechGeneration_Final_Cosyvoce/LibriTTS_1e4_2Layer_16alpha_16rank_BS14/configs_training.yaml \
+  --config result/TTS_result/ImageSpeechGeneration_Final_Cosyvoce/LibriTTS_1e4_4Layer_16alpha_16rank_BS14_NoRemoveDup/configs_training.yaml \
   --dataset "test" --folder2save "prediction_tts" \
   --debug

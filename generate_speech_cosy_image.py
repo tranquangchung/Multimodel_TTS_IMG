@@ -217,7 +217,7 @@ def generate_speech(
     print(f"{YELLOW}tts_turn: {tts_turn}, tts_eos: {tts_eos}{RESET}")
 
     # --- chuẩn hoá text
-    text_source = remove_special_characters(text_source)
+    # text_source = remove_special_characters(text_source)
 
     # --- tokenize + nối BOS_TTS (KHÔNG hardcode 'cuda:0')
     encoded_inputs = tokenizer(text_source, return_tensors='pt', padding=True, truncation=True).to(device)
