@@ -38,7 +38,6 @@ from torch.nn.attention.flex_attention import (
     flex_attention,
 )
 from autoregressive.models.generate import generate as generate_img_fn
-from transformers import CLIPProcessor, CLIPModel
 
 
 def find_multiple(n: int, k: int):
@@ -694,15 +693,6 @@ class MultiTaskImageSpeech(nn.Module):
             rope_scaling=None,
         )
         print("Shape of freqs_cis:", self.speech_freqs_cis.shape)
-
-        # CLIP prompt embeddings store (expects per-tag vectors of dim 512)
-        clip_model_name = "openai/clip-vit-base-patch32"
-        self.clip_processor = CLIPProcessor.from_pretrained(clip_model_name)
-        self.clip_model = CLIPModel.from_pretrained(clip_model_name)
-        # fronzen CLIP model
-        for param in self.clip_model.parameters():
-            param.requires_grad = False
-        self.clip_model.eval()
         # project to 512-dim to 1280-dim
         self.style_proj = nn.Linear(512, self.config.dim)
 
@@ -722,7 +712,7 @@ class MultiTaskImageSpeech(nn.Module):
         targets: Optional[torch.Tensor] = None,
         input_pos: Optional[torch.Tensor] = None,
         mask: Optional[torch.Tensor] = None,
-        prompt_instructions: Optional[List[str]] = None,
+        style_embeddings: Optional[torch.Tensor] = None,
     ):
         p = next(self.img.parameters())
         h = self.text_embeddings(idx).to(device=p.device, dtype=p.dtype)
@@ -740,12 +730,7 @@ class MultiTaskImageSpeech(nn.Module):
                 for layer in self.img.layers:
                     h = layer(h, freqs_cis, input_pos, mask)
         # Extra speech-only layers
-        # extract style embedding from CLIP text encoder
-        promt_inputs = self.clip_processor(text=prompt_instructions, return_tensors="pt", padding=True, truncation=True).to(device=p.device)
-        with torch.no_grad():
-            style_embeddings = self.clip_model.get_text_features(**promt_inputs)  # [B, 512]
-        style_embeddings = self.style_proj(style_embeddings)# [B, 1280]
-
+        style_embeddings = self.style_proj(style_embeddings)  # [B, 1280]
         for layer in self.speech_layers:
             h = layer(h, freqs_cis, input_pos, mask, style_embeddings)
 

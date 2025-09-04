@@ -167,6 +167,7 @@ class DatasetT2S(Dataset):
         )
         file_name = item.get('audio_path').split('/')[-1].replace('.wav', '')
         prompt_instruction = instruction_from_filename(file_name, n_per_file=6)
+        # print(f"{file_name} -- {prompt_instruction}")
 
         text_token_len = model_inputs["attention_mask"].sum().item()
         text_task = model_inputs["input_ids"][0][:text_token_len].tolist()

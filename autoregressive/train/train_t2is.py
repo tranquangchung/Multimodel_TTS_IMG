@@ -16,6 +16,7 @@ sys.path.append("/home/ldap-users/s2220411/Code/new_explore_multimodel/LlamaGen"
 # from autoregressive.models.gpt import GPT_XXL_speech, GPT_Small_speech, GPT_XL, MultiTaskImageSpeech
 # from autoregressive.models.gpt_cosy import GPT_XXL_speech, GPT_Small_speech, GPT_XL, MultiTaskImageSpeech
 from autoregressive.models.gpt_cosy_prompt import GPT_XXL_speech, GPT_Small_speech, GPT_XL, MultiTaskImageSpeech
+from transformers import CLIPProcessor, CLIPModel
 
 
 from transformers.optimization import get_linear_schedule_with_warmup
@@ -184,7 +185,7 @@ def main():
     model.to(device)
 
     #### Load pretrained model to fine-tune EARS
-    pretrained_checkpoint = "/home/ldap-users/quangchung-t/Code/new_explore_multimodel/LlamaGen/result/TTS_result/ImageSpeechGeneration_Final_Cosyvoce/LibriTTS_1e4_4Layer_16alpha_16rank_BS14_NoRemoveDup/model_avg.pth"
+    pretrained_checkpoint = "/home/ldap-users/quangchung-t/Code/new_explore_multimodel/LlamaGen/result/TTS_result/ImageSpeechGeneration_Final_Cosyvoce/LibriTTS_1e4_4Layer_16alpha_16rank_BS14_RemoveDup_KeepPunctuation/model_avg.pth"
     checkpoint = torch.load(pretrained_checkpoint, map_location="cpu")
     if 'module.' in list(checkpoint['model'].keys())[0]:
         new_state_dict = {}
@@ -194,6 +195,15 @@ def main():
     model.load_state_dict(checkpoint['model'], strict=False)
     print(f"{GREEN}Model loaded from {pretrained_checkpoint}{RESET}")
     #### Load pretrained model to fine-tune EARS
+
+    # CLIP prompt embeddings store (expects per-tag vectors of dim 512)
+    clip_model_name = "openai/clip-vit-base-patch32"
+    clip_processor = CLIPProcessor.from_pretrained(clip_model_name)
+    clip_model = CLIPModel.from_pretrained(clip_model_name)
+    # fronzen CLIP model
+    for param in clip_model.parameters():
+        param.requires_grad = False
+    clip_model.eval().to(device)
 
     logger.info(model)
     # Wrap the model with DDP
@@ -300,9 +310,16 @@ def main():
             primary_loss_tts = torch.tensor(0.0, device=device)
             primary_loss_asr = torch.tensor(0.0, device=device)
             prompt_instructions = batch['prompt_instructions']
+
+            # extract style embedding from CLIP text encoder
+            promt_inputs = clip_processor(text=prompt_instructions, return_tensors="pt", padding=True,
+                                               truncation=True).to(device=device)
+            with torch.no_grad():
+                style_embeddings = clip_model.get_text_features(**promt_inputs)  # [B, 512]
+
             if training_tts:
                 input_ids, attention_mask, labels = process_data_forward(batch, device, task="TTS")
-                outputs = model.speech_forward(idx=input_ids, mask=attention_mask, targets=labels, prompt_instructions=prompt_instructions)
+                outputs = model.speech_forward(idx=input_ids, mask=attention_mask, targets=labels, style_embeddings=style_embeddings)
                 primary_loss_tts = outputs.get("loss", torch.tensor(0.0, device=device))
                 if primary_loss_tts.dim() > 0:
                     primary_loss_tts = primary_loss_tts.mean()
@@ -352,9 +369,17 @@ def main():
                     for batch in tqdm(dev_loader, desc="Validation", leave=False, disable=(rank != 0)):
                         primary_loss_tts = torch.tensor(0.0, device=device)
                         primary_loss_asr = torch.tensor(0.0, device=device)
+                        prompt_instructions = batch['prompt_instructions']
+                        # extract style embedding from CLIP text encoder
+                        # print(prompt_instructions)
+                        promt_inputs = clip_processor(text=prompt_instructions, return_tensors="pt", padding=True,
+                                                      truncation=True).to(device=device)
+                        with torch.no_grad():
+                            style_embeddings = clip_model.get_text_features(**promt_inputs)  # [B, 512]
+
                         if training_tts:
                             input_ids, attention_mask, labels = process_data_forward(batch, device, task="TTS")
-                            outputs = model.speech_forward(idx=input_ids, mask=attention_mask, targets=labels)
+                            outputs = model.speech_forward(idx=input_ids, mask=attention_mask, targets=labels, style_embeddings=style_embeddings)
                             primary_loss_tts = outputs.get("loss", torch.tensor(0.0, device=device))
                             if primary_loss_tts.dim() > 0:
                                 primary_loss_tts = primary_loss_tts.mean()

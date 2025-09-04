@@ -19,7 +19,8 @@ import librosa
 import sys
 
 # from autoregressive.models.gpt import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
-from autoregressive.models.gpt_cosy import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
+# from autoregressive.models.gpt_cosy import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
+from autoregressive.models.gpt_cosy_prompt import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
 sys.path.append('/home/ldap-users/s2220411/Code/new_explore_tts/CosyVoice')
 sys.path.append('/home/ldap-users/s2220411/Code/new_explore_tts/CosyVoice/third_party/Matcha-TTS')
 from cosyvoice.cli.frontend import CosyVoiceFrontEnd
