@@ -98,7 +98,7 @@ def evaluate_transcription(groundtruth, transcript_ars):
 
 
 def remove_consecutive_duplicates(number_sequence):
-    # distinct_numbers = [number_sequence[i] for i in range(len(number_sequence)) if i == 0 or number_sequence[i] != number_sequence[i - 1]]
+    distinct_numbers = [number_sequence[i] for i in range(len(number_sequence)) if i == 0 or number_sequence[i] != number_sequence[i - 1]]
     # remove token overrange 0-6560
     distinct_numbers = [x for x in number_sequence if int(x) < 6561]
     return distinct_numbers
@@ -266,7 +266,7 @@ def generate_speech(
     # --- Flow (mel) + HIFT (audio)
     speech_token_predict = torch.tensor(predict_unit, dtype=torch.int32, device=device).unsqueeze(0)  # [1, T]
     hift_cache_source = torch.zeros(1, 1, 0, device=device)
-
+    pdb.set_trace()
     with torch.cuda.amp.autocast(enabled=fp16):
         tts_mel, _ = cosyvoice_model.flow.inference(
             token=speech_token_predict,
@@ -462,7 +462,7 @@ def inference(config):
     lang = "English"  # Default language
 
     ## load cosyvoice2
-    model_dir = '/home/ldap-users/s2220411/Code/new_explore_tts/MachineSpeechChain_ASRU25/pretrained_models/CosyVoice2-0.5B'
+    model_dir = 'pretrained_models/CosyVoice2-0.5B'
     hyper_yaml_path = '{}/cosyvoice2.yaml'.format(model_dir)
     with open(hyper_yaml_path, 'r') as f:
         configs = load_hyperpyyaml(f, overrides={'qwen_pretrain_path': os.path.join(model_dir, 'CosyVoice-BlankEN')})

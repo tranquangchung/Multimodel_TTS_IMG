@@ -18,7 +18,7 @@ import librosa
 ### this is the code from the Grad-TTS
 import sys
 
-from autoregressive.models.gpt import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
+# from autoregressive.models.gpt import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
 from autoregressive.models.gpt_cosy import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
 sys.path.append('/home/ldap-users/s2220411/Code/new_explore_tts/CosyVoice')
 sys.path.append('/home/ldap-users/s2220411/Code/new_explore_tts/CosyVoice/third_party/Matcha-TTS')
@@ -97,7 +97,7 @@ def evaluate_transcription(groundtruth, transcript_ars):
 def remove_consecutive_duplicates(number_sequence):
     distinct_numbers = [number_sequence[i] for i in range(len(number_sequence)) if i == 0 or number_sequence[i] != number_sequence[i - 1]]
     # remove token overrange 0->999
-    distinct_numbers = [x for x in distinct_numbers if int(x) < 1000]
+    distinct_numbers = [x for x in distinct_numbers if int(x) < 6561]
     return distinct_numbers
 
 def get_mel(filepath):
@@ -161,10 +161,16 @@ def remove_special_characters(text):
     return text.lower().strip()
 
 text_sources = [
-    "in the middle of a mountain meadow, a bear sits quietly, planting tiny seeds in a circle around him. ",
-    "he wears round glasses and a patchy gardener’s hat. ",
-    "as the sun rises, the seeds bloom instantly into colorful flowers—each one with a face that smiles and hums softly. ",
-    "butterflies hover near him, and the bear carefully writes in a little notebook made of leaves.",
+    "A small rabbit hopped through the meadow after the rain, its damp fur shining. Under a leaf, it sat still, listening with wonder.",
+    "An owl perched high on a branch as stars glowed above. Its bright eyes watched the dark path, wings ready to fly.",
+    "A turtle moved slowly along the shore, waves touching its shell. It carried peace within, unhurried toward the sea.",
+    "A gentle deer stood at the forest’s edge, golden fields stretching wide. Thin but strong, it breathed in the fading light.",
+    "A young bear sat by a stream, paws dipping into cool water. With bright eyes, it played as the forest hummed around it.",
+    "A cat stretched on the windowsill as rain tapped softly on the glass. Yawning, it curled into a ball, warm and safe.",
+    "A dog raced across the bright field, ears flying back. Stopping to sniff, it dashed forward again, chasing joy.",
+    "A tiny bird puffed its feathers against the breeze as the morning sky glowed. Tilting its head, it sang a clear note of hope.",
+    "A squirrel scurried along a branch, clutching an acorn tight. Without fear, it leapt to the next branch with ease.",
+    "A little hedgehog shuffled through dusk grass, leaving soft trails in the earth. When the breeze rustled, it curled slightly before moving on."
 ]
 
 def generate_speech(
@@ -194,10 +200,6 @@ def generate_speech(
     tts_eos  = configs['custom_data']['eos_tts']
     print(f"{YELLOW}tts_turn: {tts_turn}, tts_eos: {tts_eos}{RESET}")
 
-    # --- chuẩn hoá text
-    # text_source = remove_special_characters(text_source)
-
-    # --- tokenize + nối BOS_TTS (KHÔNG hardcode 'cuda:0')
     encoded_inputs = tokenizer(text_source, return_tensors='pt', padding=True, truncation=True).to(device)
     append_turn = torch.tensor([[tts_turn]], device=encoded_inputs['input_ids'].device)
     append_mask = torch.tensor([[1]], device=encoded_inputs['attention_mask'].device)
@@ -244,7 +246,6 @@ def generate_speech(
     # --- Flow (mel) + HIFT (audio)
     speech_token_predict = torch.tensor(predict_unit, dtype=torch.int32, device=device).unsqueeze(0)  # [1, T]
     hift_cache_source = torch.zeros(1, 1, 0, device=device)
-
     with torch.cuda.amp.autocast(enabled=fp16):
         tts_mel, _ = cosyvoice_model.flow.inference(
             token=speech_token_predict,
@@ -279,6 +280,7 @@ def perform_inference(model, tokenizer, test_data, frontend, cosyvoice_model, co
     transcript_ars = []
     for index, item in enumerate(test_data):
         text_source = item['transcript'].strip()
+        # text_source = text_sources[index % len(text_sources)]
         path2save_audio = os.path.join(path2save_root, f"audio_{index}.wav")
         generate_speech(
             model=model,
