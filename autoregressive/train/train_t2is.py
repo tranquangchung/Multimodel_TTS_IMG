@@ -14,7 +14,8 @@ from transformers import AutoTokenizer
 import sys
 sys.path.append("/home/ldap-users/s2220411/Code/new_explore_multimodel/LlamaGen")
 # from autoregressive.models.gpt import GPT_XXL_speech, GPT_Small_speech, GPT_XL, MultiTaskImageSpeech
-from autoregressive.models.gpt_cosy import GPT_XXL_speech, GPT_Small_speech, GPT_XL, MultiTaskImageSpeech
+# from autoregressive.models.gpt_cosy import GPT_XXL_speech, GPT_Small_speech, GPT_XL, MultiTaskImageSpeech
+from autoregressive.models.gpt_cosy_prompt import GPT_XXL_speech, GPT_Small_speech, GPT_XL, MultiTaskImageSpeech
 
 
 from transformers.optimization import get_linear_schedule_with_warmup
@@ -169,6 +170,7 @@ def main():
     img_model_path = "/home/ldap-users/s2220411/Code/new_explore_multimodel/LlamaGen/t2i_XL_stage2_512.pt"
     checkpoint = torch.load(img_model_path, map_location="cpu")
     img_model.load_state_dict(checkpoint['model'], strict=True)
+    print(f"{RED}Loaded image generation model from: {img_model_path} {RESET}")
 
     model = MultiTaskImageSpeech(
         pretrained_image_model=img_model,
@@ -180,6 +182,18 @@ def main():
         lora_rank=config['model_config']['lora_rank'],
     )
     model.to(device)
+
+    #### Load pretrained model to fine-tune EARS
+    pretrained_checkpoint = "/home/ldap-users/quangchung-t/Code/new_explore_multimodel/LlamaGen/result/TTS_result/ImageSpeechGeneration_Final_Cosyvoce/LibriTTS_1e4_4Layer_16alpha_16rank_BS14_NoRemoveDup/model_avg.pth"
+    checkpoint = torch.load(pretrained_checkpoint, map_location="cpu")
+    if 'module.' in list(checkpoint['model'].keys())[0]:
+        new_state_dict = {}
+        for k, v in checkpoint['model'].items():
+            new_state_dict[k.replace('module.', '')] = v
+        checkpoint['model'] = new_state_dict
+    model.load_state_dict(checkpoint['model'], strict=False)
+    print(f"{GREEN}Model loaded from {pretrained_checkpoint}{RESET}")
+    #### Load pretrained model to fine-tune EARS
 
     logger.info(model)
     # Wrap the model with DDP
@@ -285,9 +299,10 @@ def main():
         for batch in progress_bar:
             primary_loss_tts = torch.tensor(0.0, device=device)
             primary_loss_asr = torch.tensor(0.0, device=device)
+            prompt_instructions = batch['prompt_instructions']
             if training_tts:
                 input_ids, attention_mask, labels = process_data_forward(batch, device, task="TTS")
-                outputs = model.speech_forward(idx=input_ids, mask=attention_mask, targets=labels)
+                outputs = model.speech_forward(idx=input_ids, mask=attention_mask, targets=labels, prompt_instructions=prompt_instructions)
                 primary_loss_tts = outputs.get("loss", torch.tensor(0.0, device=device))
                 if primary_loss_tts.dim() > 0:
                     primary_loss_tts = primary_loss_tts.mean()

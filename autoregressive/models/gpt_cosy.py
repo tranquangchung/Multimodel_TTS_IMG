@@ -762,7 +762,7 @@ class MultiTaskImageSpeech(nn.Module):
             probs = F.softmax(logits, dim=-1)
             idx_next = torch.multinomial(probs, num_samples=1)
 
-            # optional EOS handling if you reserve 1001 as EOS like your speech model
+            # Stop if EOS token is generated
             if idx_next.item() == self.vocab_speech_size - 1:
                 break
 

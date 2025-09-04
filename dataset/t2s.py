@@ -16,6 +16,7 @@ import random
 import numtext as nt
 import re
 _whitespace_re = re.compile(r'\s+')
+from .voice_instruction_builder_V2 import instruction_from_filename
 
 
 def plot_histogram(data, type_data="UNIT"):
@@ -164,6 +165,8 @@ class DatasetT2S(Dataset):
             padding="max_length",
             return_tensors="pt"
         )
+        file_name = item.get('audio_path').split('/')[-1].replace('.wav', '')
+        prompt_instruction = instruction_from_filename(file_name, n_per_file=6)
 
         text_token_len = model_inputs["attention_mask"].sum().item()
         text_task = model_inputs["input_ids"][0][:text_token_len].tolist()
@@ -201,6 +204,7 @@ class DatasetT2S(Dataset):
 
             'language_source': language_source,
             'text_source': source_text,
+            'prompt_instruction': prompt_instruction,
         }
 
     def collate_fn(self, batch):
@@ -220,6 +224,8 @@ class DatasetT2S(Dataset):
         len_token_input_asr = [item['len_token_input_asr'] for item in batch]
         labels_asr = [item['labels_asr'] for item in batch]
         len_token_label_asr = [item['len_token_label_asr'] for item in batch]
+
+        prompt_instructions = [item['prompt_instruction'] for item in batch]
 
         # Padding for TTS
         max_len_tts = max([len(ids) for ids in input_ids_tts])
@@ -296,6 +302,7 @@ class DatasetT2S(Dataset):
 
             'language_source': language_source,
             'text_source': text_source,
+            'prompt_instructions': prompt_instructions,
         }
 
     def _prepare_4d_causal_attention(

@@ -18,6 +18,7 @@ import librosa
 ### this is the code from the Grad-TTS
 import sys
 
+from autoregressive.models.gpt import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
 from autoregressive.models.gpt_cosy import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
 sys.path.append('/home/ldap-users/s2220411/Code/new_explore_tts/CosyVoice')
 sys.path.append('/home/ldap-users/s2220411/Code/new_explore_tts/CosyVoice/third_party/Matcha-TTS')
@@ -36,10 +37,6 @@ import torchaudio as ta
 import time
 import random
 import glob
-from tokenizer.tokenizer_image.vq_model import VQ_16
-from transformers import T5EncoderModel, AutoTokenizer
-from autoregressive.models.generate import generate as generate_img_fn
-from torchvision.utils import save_image
 from hyperpyyaml import load_hyperpyyaml
 
 
@@ -98,9 +95,9 @@ def evaluate_transcription(groundtruth, transcript_ars):
 
 
 def remove_consecutive_duplicates(number_sequence):
-    # distinct_numbers = [number_sequence[i] for i in range(len(number_sequence)) if i == 0 or number_sequence[i] != number_sequence[i - 1]]
-    # remove token overrange 0-6560
-    distinct_numbers = [x for x in number_sequence if int(x) < 6561]
+    distinct_numbers = [number_sequence[i] for i in range(len(number_sequence)) if i == 0 or number_sequence[i] != number_sequence[i - 1]]
+    # remove token overrange 0->999
+    distinct_numbers = [x for x in distinct_numbers if int(x) < 1000]
     return distinct_numbers
 
 def get_mel(filepath):
@@ -163,30 +160,11 @@ def remove_special_characters(text):
     text = re.sub(_whitespace_re, ' ', text)
     return text.lower().strip()
 
-# text_sources = [
-#     "A small rabbit hopped through the meadow after the rain. Its ears twitched at every sound, and its fur was still damp. It found a quiet spot under a leaf and watched drops fall to the ground. The world felt large and calm, and the rabbit simply listened, heart beating soft with wonder.",
-#     "An owl perched on a tall branch in the silent night. The stars glowed above, and the wind whispered through the trees. The owl’s eyes shone bright, watching the dark path below. It spread its wings slowly, ready to fly. For the owl, the night was not lonely, but full of secrets.",
-#     "A turtle moved slowly along the shore, each step steady and sure. Waves rolled in and touched its shell before sliding back. The air smelled of salt, and the sand was warm underfoot. The turtle did not hurry. It carried a quiet world within, finding peace in every small movement toward the sea.",
-#     "A gentle deer stood at the edge of the forest, nose lifted to the breeze. The field stretched wide, golden in the fading light. Its legs were thin but strong, ready to leap if needed. Yet in that moment, the deer simply stood still, breathing in the quiet beauty of the open air.",
-#     "A young bear sat by a stream, paws dipping into the cool water. Small fish flashed like silver under the surface. The bear leaned close, eyes bright with hunger and play. The forest hummed softly around it, full of life. For the bear, the world was both a playground and a home.",
-#     "A cat stretched on the windowsill, tail curling like a ribbon. Outside, the rain tapped softly on the glass. The cat’s eyes followed every drop, slow and calm. It gave a long yawn, then curled into a ball, listening to the gentle rhythm. In that small space, the cat felt warm and safe.",
-#     "A dog ran across the field with ears flying back and tongue hanging out. The grass bent under its paws, and the sky was wide and bright. It stopped to sniff the ground, then dashed forward again, chasing nothing but joy. For the dog, every open space was a new adventure.",
-#     "A tiny bird sat on the edge of a branch, feathers puffed against the breeze. The morning sun painted the sky in soft colors. The bird tilted its head, then sang a clear, sweet note. The sound drifted far, carrying hope with it. Even small wings could fill the sky with song.",
-#     "A squirrel scurried along a tree branch, tail flicking as it moved. It held an acorn tight, eyes quick and alert. The forest floor looked far below, but the squirrel did not fear. It jumped to the next branch with ease, carrying both food and courage high above the quiet ground.",
-#     "A little hedgehog shuffled through the grass at dusk. Its tiny feet pressed soft trails in the earth. The air smelled of leaves and soil, cool against its nose. It paused when a breeze rustled, curling slightly before moving on. In the gentle half-light, the hedgehog searched for supper, steady and calm.",
-# ]
-
 text_sources = [
-    "A small rabbit hopped through the meadow after the rain, its damp fur shining. Under a leaf, it sat still, listening with wonder.",
-    "An owl perched high on a branch as stars glowed above. Its bright eyes watched the dark path, wings ready to fly.",
-    "A turtle moved slowly along the shore, waves touching its shell. It carried peace within, unhurried toward the sea.",
-    "A gentle deer stood at the forest’s edge, golden fields stretching wide. Thin but strong, it breathed in the fading light.",
-    "A young bear sat by a stream, paws dipping into cool water. With bright eyes, it played as the forest hummed around it.",
-    "A cat stretched on the windowsill as rain tapped softly on the glass. Yawning, it curled into a ball, warm and safe.",
-    "A dog raced across the bright field, ears flying back. Stopping to sniff, it dashed forward again, chasing joy.",
-    "A tiny bird puffed its feathers against the breeze as the morning sky glowed. Tilting its head, it sang a clear note of hope.",
-    "A squirrel scurried along a branch, clutching an acorn tight. Without fear, it leapt to the next branch with ease.",
-    "A little hedgehog shuffled through dusk grass, leaving soft trails in the earth. When the breeze rustled, it curled slightly before moving on."
+    "in the middle of a mountain meadow, a bear sits quietly, planting tiny seeds in a circle around him. ",
+    "he wears round glasses and a patchy gardener’s hat. ",
+    "as the sun rises, the seeds bloom instantly into colorful flowers—each one with a face that smiles and hums softly. ",
+    "butterflies hover near him, and the bear carefully writes in a little notebook made of leaves.",
 ]
 
 def generate_speech(
@@ -292,58 +270,16 @@ def generate_speech(
         print(f"{GREEN}Saved: {path2save_audio}{RESET}")
 
 
-def generate_image(model, tokenizer, vq_model, t5_model, text_source, device, configs, path2save_image=None):
-    text_tokens_and_mask = tokenizer(
-        text_source,
-        max_length=120,
-        padding='max_length',
-        truncation=True,
-        return_attention_mask=True,
-        add_special_tokens=True,
-        return_tensors='pt'
-    )
-
-    text_tokens_and_mask['input_ids'] = text_tokens_and_mask['input_ids'].to(device)
-    emb_masks = text_tokens_and_mask['attention_mask'].to(device)
-    with torch.no_grad():
-        text_encoder_embs = t5_model(
-            input_ids=text_tokens_and_mask['input_ids'],
-            attention_mask=emb_masks,
-        )['last_hidden_state'].detach()  # [B, T, D], D = 2048
-
-    new_emb_masks = torch.flip(emb_masks, dims=[-1])
-    text_source_embs = []
-    for i in range(text_encoder_embs.shape[0]):
-        valid_num = int(new_emb_masks[i].sum().item())
-        new_emb = torch.cat([text_encoder_embs[i, valid_num:], text_encoder_embs[i, :valid_num]])
-        text_source_embs.append(new_emb)
-    text_source_embs = torch.stack(text_source_embs)
-    c_indices = text_source_embs * new_emb_masks[:, :, None]
-    latent_size = 32
-    codebook_embed_dim = 8
-    qzshape = [len(c_indices), codebook_embed_dim, latent_size, latent_size]
-    index_sample = model.image_generate(
-        c_indices, latent_size**2,
-        new_emb_masks, cfg_scale=7.5,
-        temperature=1.0, top_k=1000,
-        top_p=1.0, sample_logits=True,
-    )
-    samples = vq_model.decode_code(index_sample, qzshape) # output value is between [-1, 1]
-    if path2save_image is not None:
-        save_image(samples, path2save_image, normalize=True, value_range=(-1, 1))
-
-
-
-def perform_inference(model, tokenizer, vq_model, t5_model, device, frontend, cosyvoice_model, configs, lang=None):
+def perform_inference(model, tokenizer, test_data, frontend, cosyvoice_model, configs, lang=None):
     path2save_root = os.path.join(configs['training']['output_dir'], "samples")
     if not os.path.exists(path2save_root):
         os.makedirs(path2save_root)
     # Load ground truth
     groundtruth = []
     transcript_ars = []
-    for index, text_source in enumerate(text_sources):
+    for index, item in enumerate(test_data):
+        text_source = item['transcript'].strip()
         path2save_audio = os.path.join(path2save_root, f"audio_{index}.wav")
-        path2save_image = os.path.join(path2save_root, f"image_{index}.png")
         generate_speech(
             model=model,
             tokenizer=tokenizer,
@@ -355,25 +291,18 @@ def perform_inference(model, tokenizer, vq_model, t5_model, device, frontend, co
             lang=lang,
             path2save_audio=path2save_audio
         )
-        generate_image(
-            model=model,
-            tokenizer=tokenizer,
-            t5_model=t5_model,
-            vq_model=vq_model,
-            text_source=text_source,
-            device=device,
-            configs=configs,
-            path2save_image=path2save_image
-        )
-
         #### transcription using ASR model
         transcript = transcription_whisper(path2save_audio, language=lang)
         print(f"{'text source'.ljust(20)}: {text_source}")
         print(f"{'transcript (ASR)'.ljust(20)}: {transcript}")
         groundtruth.append(remove_special_characters(text_source))
         transcript_ars.append(remove_special_characters(transcript))
-
-
+        if args.debug and index >= 2:
+            break
+        if index % 100 == 0:
+            print(f"Processed {index} samples")
+        if index > 1000:
+            break
     ############################
     print(f"{GREEN}Done. Check out {path2save_root}{RESET}")
     # evaluate
@@ -434,38 +363,21 @@ def inference(config):
     model.load_state_dict(checkpoint['model'], strict=True)
     print(f"{GREEN}Model loaded from {pretrained_checkpoint}{RESET}")
     ############################
-    codebook_size = 16384
-    codebook_embed_dim = 8
-    vq_ckpt = '/home/ldap-users/s2220411/Code/new_explore_multimodel/LlamaGen/pretrained_models/vq_ds16_t2i.pt'
-    vq_model = VQ_16(
-        codebook_size=codebook_size,
-        codebook_embed_dim=codebook_embed_dim)
-    vq_model.to(device)
-    vq_model.eval()
-    vq_model.load_state_dict(torch.load(vq_ckpt, map_location="cpu")["model"])
-    print(f"image tokenizer is loaded from {vq_ckpt}")
-    # load t5 model
-    t5_path = "/home/ldap-users/s2220411/Code/new_explore_multimodel/LlamaGen/pretrained_models/t5-ckpt/flan-t5-xl"
-    t5_model_kwargs = {'low_cpu_mem_usage': True, 'torch_dtype': torch.bfloat16}
-    t5_model_kwargs['device_map'] = {'shared': device, 'encoder': device}
-    t5_model = T5EncoderModel.from_pretrained(t5_path, **t5_model_kwargs).eval()
-    print("T5 model loaded from:", t5_path)
-
-    # 8. Load test data
-    # path_file = "/home/ldap-users/s2220411/Code/new_explore_tts/MachineSpeechChain_ASRU25/dataset/LibriTTS/English/test-clean.json"
-    path_dir = config['dataset']['path_dir']
-    if len(path_dir) > 1:
-        raise ValueError(f"Path directory should be a single path, got {path_dir}")
-    else:
-        path_dir = path_dir[0]
-
     lang = "English"  # Default language
+    print(f"{YELLOW}Processing {lang}{RESET}")
+    path_dir = "/home/ldap-users/s2220411/Code/new_explore_tts/MachineSpeechChain_ASRU25/dataset/LibriTTS"
+    path_file = os.path.join(path_dir, lang, f"{args.dataset}.json")
+    print(f"Loading test data from {path_file}")
+    with open(path_file, 'r') as f:
+        test_data = json.load(f)
+        print(f"lang: {len(test_data)} samples")
 
     ## load cosyvoice2
-    model_dir = '/home/ldap-users/s2220411/Code/new_explore_tts/MachineSpeechChain_ASRU25/pretrained_models/CosyVoice2-0.5B'
+    model_dir = 'pretrained_models/CosyVoice2-0.5B'
     hyper_yaml_path = '{}/cosyvoice2.yaml'.format(model_dir)
     with open(hyper_yaml_path, 'r') as f:
-        configs = load_hyperpyyaml(f, overrides={'qwen_pretrain_path': os.path.join(model_dir, 'CosyVoice-BlankEN')})
+        configs = load_hyperpyyaml(f,
+                                   overrides={'qwen_pretrain_path': os.path.join(model_dir, 'CosyVoice-BlankEN')})
     frontend = CosyVoiceFrontEnd(configs['get_tokenizer'],
                                  configs['feat_extractor'],
                                  '{}/campplus.onnx'.format(model_dir),
@@ -480,13 +392,15 @@ def inference(config):
                          '{}/hift.pt'.format(model_dir))
     print("load frontend done")
 
-    perform_inference(model, tokenizer, vq_model, t5_model, device, frontend, cosyvoice_model, configs=config, lang=lang)
+    perform_inference(model, tokenizer, test_data, frontend, cosyvoice_model, configs=config, lang=lang)
 
 
 if __name__ == "__main__":
     # 1. Parse command-line arguments
     parser = argparse.ArgumentParser(description="Inference script")
     parser.add_argument('--config', type=str, required=True, help='Path to the YAML config file.')
+    parser.add_argument('--dataset', type=str, required=False, help='Dataset to use for inference.', default="test-clean.json")
+    parser.add_argument('--folder2save', type=str, required=False, help='Language code to translate from.', default="prediction")
     parser.add_argument('--debug', action='store_true', help='Enable debug mode with smaller datasets.')
     args = parser.parse_args()
     print(args)
