@@ -706,7 +706,6 @@ class MultiTaskImageSpeech(nn.Module):
         # Extra speech-only layers
         for layer in self.speech_layers:
             h = layer(h, freqs_cis, input_pos, mask)
-
         h = self.speech_norm(h)
         logits = self.speech_head(h).float()
 
