@@ -694,7 +694,8 @@ class MultiTaskImageSpeech(nn.Module):
         )
         print("Shape of freqs_cis:", self.speech_freqs_cis.shape)
         # project to 512-dim to 1280-dim
-        self.style_proj = nn.Linear(512, self.config.dim)
+        # self.style_proj = nn.Linear(512, self.config.dim)
+        self.style_proj = nn.Linear(768, self.config.dim)
 
     def _set_lora(self, enabled: bool):
         for m in self.img.modules():
@@ -733,7 +734,6 @@ class MultiTaskImageSpeech(nn.Module):
         style_embeddings = self.style_proj(style_embeddings)  # [B, 1280]
         for layer in self.speech_layers:
             h = layer(h, freqs_cis, input_pos, mask, style_embeddings)
-
         h = self.speech_norm(h)
         logits = self.speech_head(h).float()
 
