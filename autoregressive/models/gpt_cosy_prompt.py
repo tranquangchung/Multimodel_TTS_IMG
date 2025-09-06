@@ -694,8 +694,8 @@ class MultiTaskImageSpeech(nn.Module):
         )
         print("Shape of freqs_cis:", self.speech_freqs_cis.shape)
         # project to 512-dim to 1280-dim
-        # self.style_proj = nn.Linear(512, self.config.dim)
-        self.style_proj = nn.Linear(768, self.config.dim)
+        self.style_proj = nn.Linear(512, self.config.dim)
+        # self.style_proj = nn.Linear(768, self.config.dim)
 
     def _set_lora(self, enabled: bool):
         for m in self.img.modules():
@@ -751,7 +751,7 @@ class MultiTaskImageSpeech(nn.Module):
 
     @torch.no_grad()
     def speech_generate(
-        self, idx, max_new_tokens, temperature=1.0, top_k=None, top_p=None, min_p=None
+        self, idx, max_new_tokens, temperature=1.0, top_k=None, top_p=None, min_p=None, style_embedding=None
     ):
         """
         Minimal sampler that uses speech_forward() with no targets.
@@ -760,7 +760,7 @@ class MultiTaskImageSpeech(nn.Module):
         self._set_lora(True)
         for _ in range(max_new_tokens):
             context = idx if idx.size(1) < self.config.block_size else idx[:, -self.config.block_size:]
-            out = self.speech_forward(context)
+            out = self.speech_forward(context, style_embeddings=style_embedding)
             logits = out["logits"][:, -1, :] / max(temperature, 1e-6)
 
             if top_p is not None and top_p > 0.0:

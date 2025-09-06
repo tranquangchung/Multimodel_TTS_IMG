@@ -189,8 +189,7 @@ def generate_speech(
     configs,
     frontend,
     cosyvoice_model,
-    clip_processor,
-    clip_model,
+    t5_model,
     lang=None,
     path2save_audio=None,
 ):
@@ -216,11 +215,10 @@ def generate_speech(
     encoded_inputs['input_ids']     = torch.cat([encoded_inputs['input_ids'], append_turn], dim=1)
     encoded_inputs['attention_mask'] = torch.cat([encoded_inputs['attention_mask'], append_mask], dim=1)
     encoded_inputs_length = encoded_inputs['input_ids'].shape[1]
-    # extract style embedding from CLIP text encoder
-    promt_inputs = clip_processor(text=prompt_instruction, return_tensors="pt", padding=True,
-                                  truncation=True).to(device=device)
+    # extract style embedding from T5 model
     with torch.no_grad():
-        style_embedding = clip_model.get_text_features(**promt_inputs)  # [B, 512]
+        style_embedding = t5_model.encode(prompt_instruction, convert_to_tensor=True, device=device, show_progress_bar=False)  # [B, 768]
+        style_embedding = style_embedding.clone().unsqueeze(0)
     # --- sinh unit bằng AR head
     max_new_tokens = configs.get('inference', {}).get('max_length_unit', 512)
     with torch.no_grad():
@@ -286,18 +284,16 @@ def generate_speech(
         print(f"{GREEN}Saved: {path2save_audio}{RESET}")
 
 
-def perform_inference(model, tokenizer, test_data, frontend, cosyvoice_model, clip_processor, clip_model, configs, lang=None):
+def perform_inference(model, tokenizer, test_data, frontend, cosyvoice_model, t5_model, configs, lang=None):
     path2save_root = os.path.join(configs['training']['output_dir'], args.folder2save)
     if not os.path.exists(path2save_root):
         os.makedirs(path2save_root)
     # Load ground truth
     groundtruth = []
     transcript_ars = []
-
     reading_styles = [
         "fast", "slow", "whisper", "highpitch", "lowpitch"
     ]
-
     for index, item in enumerate(test_data):
         for reading_style in reading_styles:
             prompt_instruction = instruction_from_filename(reading_style, n_per_file=5)
@@ -313,8 +309,7 @@ def perform_inference(model, tokenizer, test_data, frontend, cosyvoice_model, cl
                 device=device,
                 configs=configs,
                 frontend=frontend,
-                clip_processor=clip_processor,
-                clip_model=clip_model,
+                t5_model=t5_model,
                 cosyvoice_model=cosyvoice_model,
                 lang=lang,
                 path2save_audio=path2save_audio
@@ -421,16 +416,8 @@ def inference(config):
                          '{}/hift.pt'.format(model_dir))
     print("load frontend done")
 
-    # CLIP prompt embeddings store (expects per-tag vectors of dim 512)
-    clip_model_name = "openai/clip-vit-base-patch32"
-    clip_processor = CLIPProcessor.from_pretrained(clip_model_name)
-    clip_model = CLIPModel.from_pretrained(clip_model_name)
-    # fronzen CLIP model
-    for param in clip_model.parameters():
-        param.requires_grad = False
-    clip_model.eval().to(device)
-
-    perform_inference(model, tokenizer, test_data, frontend, cosyvoice_model, clip_processor, clip_model, configs=config, lang=lang)
+    t5_model = SentenceTransformer('sentence-transformers/sentence-t5-base')
+    perform_inference(model, tokenizer, test_data, frontend, cosyvoice_model, t5_model, configs=config, lang=lang)
 
 
 if __name__ == "__main__":
