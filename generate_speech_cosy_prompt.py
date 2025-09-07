@@ -163,22 +163,22 @@ def remove_special_characters(text):
     text = re.sub(_whitespace_re, ' ', text)
     return text.lower().strip()
 
-# text_sources = [
-#     "A small rabbit hopped through the meadow after the rain, its damp fur shining. Under a leaf, it sat still, listening with wonder.",
-#     "An owl perched high on a branch as stars glowed above. Its bright eyes watched the dark path, wings ready to fly.",
-#     "A turtle moved slowly along the shore, waves touching its shell. It carried peace within, unhurried toward the sea.",
-#     "A gentle deer stood at the forest’s edge, golden fields stretching wide. Thin but strong, it breathed in the fading light.",
-#     "A young bear sat by a stream, paws dipping into cool water. With bright eyes, it played as the forest hummed around it.",
-#     "A cat stretched on the windowsill as rain tapped softly on the glass. Yawning, it curled into a ball, warm and safe.",
-#     "A dog raced across the bright field, ears flying back. Stopping to sniff, it dashed forward again, chasing joy.",
-#     "A tiny bird puffed its feathers against the breeze as the morning sky glowed. Tilting its head, it sang a clear note of hope.",
-#     "A squirrel scurried along a branch, clutching an acorn tight. Without fear, it leapt to the next branch with ease.",
-#     "A little hedgehog shuffled through dusk grass, leaving soft trails in the earth. When the breeze rustled, it curled slightly before moving on."
-# ]
-
 text_sources = [
-    "You're just the sweetest person I know and I am so happy to call you my friend. I had the best time with you, I just adore you. I love this gift, thank you!"
+    "A small rabbit hopped through the meadow after the rain, its damp fur shining. Under a leaf, it sat still, listening with wonder.",
+    "An owl perched high on a branch as stars glowed above. Its bright eyes watched the dark path, wings ready to fly.",
+    "A turtle moved slowly along the shore, waves touching its shell. It carried peace within, unhurried toward the sea.",
+    "A gentle deer stood at the forest’s edge, golden fields stretching wide. Thin but strong, it breathed in the fading light.",
+    "A young bear sat by a stream, paws dipping into cool water. With bright eyes, it played as the forest hummed around it.",
+    "A cat stretched on the windowsill as rain tapped softly on the glass. Yawning, it curled into a ball, warm and safe.",
+    "A dog raced across the bright field, ears flying back. Stopping to sniff, it dashed forward again, chasing joy.",
+    "A tiny bird puffed its feathers against the breeze as the morning sky glowed. Tilting its head, it sang a clear note of hope.",
+    "A squirrel scurried along a branch, clutching an acorn tight. Without fear, it leapt to the next branch with ease.",
+    "A little hedgehog shuffled through dusk grass, leaving soft trails in the earth. When the breeze rustled, it curled slightly before moving on."
 ]
+
+# text_sources = [
+#     "You're just the sweetest person I know and I am so happy to call you my friend. I had the best time with you, I just adore you. I love this gift, thank you!"
+# ]
 
 def generate_speech(
     model,
@@ -298,12 +298,12 @@ def perform_inference(model, tokenizer, test_data, frontend, cosyvoice_model, cl
         "fast", "slow", "whisper", "highpitch", "lowpitch"
     ]
 
-    for index, item in enumerate(test_data):
+    for index, item in enumerate(text_sources):
         for reading_style in reading_styles:
             prompt_instruction = instruction_from_filename(reading_style, n_per_file=5)
             print(f"{MAGENTA}Style: {prompt_instruction}{RESET}")
             # text_source = item['transcript'].strip()
-            text_source = text_sources[index % len(text_sources)]
+            text_source = item
             path2save_audio = os.path.join(path2save_root, f"audio_{index}_{reading_style}.wav")
             generate_speech(
                 model=model,
@@ -329,9 +329,8 @@ def perform_inference(model, tokenizer, test_data, frontend, cosyvoice_model, cl
                 break
             if index % 100 == 0:
                 print(f"Processed {index} samples")
-            if index > 1000:
+            if index > 10:
                 break
-        break
     ############################
     print(f"{GREEN}Done. Check out {path2save_root}{RESET}")
     # evaluate

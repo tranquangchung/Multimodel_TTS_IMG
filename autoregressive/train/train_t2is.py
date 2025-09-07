@@ -185,7 +185,7 @@ def main():
     model.to(device)
 
     #### Load pretrained model to fine-tune EARS
-    pretrained_checkpoint = "/home/ldap-users/quangchung-t/Code/new_explore_multimodel/LlamaGen/result/TTS_result/ImageSpeechGeneration_Final_Cosyvoce/LibriTTS_1e4_4Layer_16alpha_16rank_BS14_RemoveDup_KeepPunctuation/model_avg.pth"
+    pretrained_checkpoint = "/home/ldap-users/quangchung-t/Code/new_explore_multimodel/LlamaGen/result/TTS_result/ImageSpeechGeneration_Final_Cosyvoce/LibriTTS_1e4_8Layer_16alpha_16rank_BS14_RemoveDup_KeepPunctuation/model_avg.pth"
     checkpoint = torch.load(pretrained_checkpoint, map_location="cpu")
     if 'module.' in list(checkpoint['model'].keys())[0]:
         new_state_dict = {}

@@ -731,7 +731,8 @@ class MultiTaskImageSpeech(nn.Module):
                 for layer in self.img.layers:
                     h = layer(h, freqs_cis, input_pos, mask)
         # Extra speech-only layers
-        style_embeddings = self.style_proj(style_embeddings)  # [B, 1280]
+        if style_embeddings is not None:
+            style_embeddings = self.style_proj(style_embeddings)  # [B, 1280]
         for layer in self.speech_layers:
             h = layer(h, freqs_cis, input_pos, mask, style_embeddings)
         h = self.speech_norm(h)
