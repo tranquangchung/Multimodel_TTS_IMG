@@ -290,6 +290,7 @@ class TransformerSpeechBlock(nn.Module):
         self.ffn_norm = RMSNorm(config.dim, eps=config.norm_eps)
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.prompt_proj = nn.Linear(config.dim, 2 * config.dim)
+        self.ffn_norm_out = RMSNorm(config.dim, eps=config.norm_eps)
 
     def forward(
         self, x: torch.Tensor, freqs_cis: torch.Tensor, start_pos: int,
@@ -301,7 +302,7 @@ class TransformerSpeechBlock(nn.Module):
             x = x * gramma.unsqueeze(1)  + beta.unsqueeze(1)
         h = x + self.drop_path(self.attention(self.attention_norm(x), freqs_cis, start_pos, mask))
         out = h + self.drop_path(self.feed_forward(self.ffn_norm(h)))
-        return out
+        return self.ffn_norm_out(out)
 
 
 class Transformer(nn.Module):
