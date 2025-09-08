@@ -42,7 +42,7 @@ training:
   num_workers: 6 # Number of workers for DataLoader
   evaluation_strategy: "epoch"
   learning_rate: 1e-4
-  output_dir: !ref "result/TTS_result/ImageSpeechGeneration_Final_Cosyvoce/LibriTTS_1e4_8Layer_16alpha_16rank_BS14_RemoveDup_KeepPunctuation"
+  output_dir: !ref "result/TTS_result/ImageSpeechGeneration_Final_Cosyvoce_Norm/LibriTTS_1e4_2Layer_16alpha_16rank_BS14_RemoveDup_KeepPunctuation"
   per_device_train_batch_size: 14 #32 #10 #8 #16 #32 # 32
   per_device_eval_batch_size: 14 #32 #10 #8 #16 #32 # 32
   num_train_epochs: 1000
@@ -87,7 +87,7 @@ speech_config:
   text_vocab_size: 32100
   vocab_speech_size: 6563
   hidden_size: 512
-  n_speech_extra_layers: 8
+  n_speech_extra_layers: 2
   freeze_image_backbone: True
 
 

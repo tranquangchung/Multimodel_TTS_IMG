@@ -18,7 +18,8 @@ import librosa
 ### this is the code from the Grad-TTS
 import sys
 
-from autoregressive.models.gpt import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
+# from autoregressive.models.gpt import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
+from autoregressive.models.gpt_cosy import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
 sys.path.append('/home/ldap-users/s2220411/Code/new_explore_tts/Speech-Backbones/Grad-TTS')
 sys.path.append('/home/ldap-users/s2220411/Code/new_explore_tts/Speech-Backbones/Grad-TTS/hifi-gan')
 from model import GradTTS
@@ -183,8 +184,9 @@ def perform_inference(model, tokenizer, test_data, device, generator, vocoder, c
     # tokenizer.src_lang = lang_code
     start_time = time.time()
     for index, item in tqdm(enumerate(test_data)):
-        text_source = remove_special_characters(item['transcript'])
+        # text_source = remove_special_characters(item['transcript'])
         # text_source = remove_special_characters(text_sources[index % len(text_sources)])
+        text_source = item['transcript']
         audio_path = item['audio_path']
         file_name = os.path.basename(audio_path).split(".")[0]
         encoded_inputs = tokenizer(text_source, return_tensors='pt', padding=True, truncation=True).to(device)

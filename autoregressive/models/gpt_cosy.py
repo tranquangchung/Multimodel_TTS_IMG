@@ -279,6 +279,25 @@ class TransformerBlock(nn.Module):
         out = h + self.drop_path(self.feed_forward(self.ffn_norm(h)))
         return out
 
+class TransformerSpeechBlock(nn.Module):
+    def __init__(self, config: ModelArgs, drop_path: float):
+        super().__init__()
+        self.config_dim = config.dim
+        self.attention = Attention(config)
+        self.feed_forward = FeedForward(config)
+        self.attention_norm = RMSNorm(config.dim, eps=config.norm_eps)
+        self.ffn_norm = RMSNorm(config.dim, eps=config.norm_eps)
+        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.prompt_proj = nn.Linear(config.dim, 2 * config.dim)
+        self.ffn_norm_out = RMSNorm(config.dim, eps=config.norm_eps)
+
+    def forward(
+        self, x: torch.Tensor, freqs_cis: torch.Tensor, start_pos: int,
+            mask: Optional[torch.Tensor] = None,
+    ):
+        h = x + self.drop_path(self.attention(self.attention_norm(x), freqs_cis, start_pos, mask))
+        out = h + self.drop_path(self.feed_forward(self.ffn_norm(h)))
+        return self.ffn_norm_out(out)
 
 class Transformer(nn.Module):
     def __init__(self, config: ModelArgs):
@@ -425,7 +444,7 @@ class TransformerSpeech(nn.Module):
         dpr = [x.item() for x in torch.linspace(0, config.drop_path_rate, config.n_layer)]
         self.layers = torch.nn.ModuleList()
         for layer_id in range(config.n_layer):
-            self.layers.append(TransformerBlock(config, dpr[layer_id]))
+            self.layers.append(TransformerSpeechBlock(config, dpr[layer_id]))
 
         # output layer
         self.norm = RMSNorm(config.dim, eps=config.norm_eps)
@@ -655,7 +674,7 @@ class MultiTaskImageSpeech(nn.Module):
 
         dpr = [x.item() for x in torch.linspace(0, self.config.drop_path_rate, n_speech_extra_layers)]
         self.speech_layers = nn.ModuleList(
-            [TransformerBlock(self.config, dpr[i]) for i in range(n_speech_extra_layers)]
+            [TransformerSpeechBlock(self.config, dpr[i]) for i in range(n_speech_extra_layers)]
         )
         self.speech_norm = RMSNorm(self.config.dim, eps=self.config.norm_eps)
         self.speech_head = nn.Linear(self.config.dim, self.vocab_speech_size, bias=False)
