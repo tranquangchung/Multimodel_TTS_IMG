@@ -55,7 +55,7 @@ class ModelArgs:
     rope_base: float = 10000
     norm_eps: float = 1e-5
     initializer_range: float = 0.02
-    
+
     token_dropout_p: float = 0.1
     attn_dropout_p: float = 0.0
     resid_dropout_p: float = 0.1
@@ -229,8 +229,8 @@ class Attention(nn.Module):
         self.resid_dropout = nn.Dropout(config.resid_dropout_p)
 
     def forward(
-        self, x: torch.Tensor, freqs_cis: torch.Tensor = None, 
-        input_pos: Optional[torch.Tensor] = None, 
+        self, x: torch.Tensor, freqs_cis: torch.Tensor = None,
+        input_pos: Optional[torch.Tensor] = None,
         mask: Optional[torch.Tensor] = None
     ):
         bsz, seqlen, _ = x.shape
@@ -240,7 +240,7 @@ class Attention(nn.Module):
         xq = xq.view(bsz, seqlen, self.n_head, self.head_dim)
         xk = xk.view(bsz, seqlen, self.n_kv_head, self.head_dim)
         xv = xv.view(bsz, seqlen, self.n_kv_head, self.head_dim)
-        
+
         xq = apply_rotary_emb(xq, freqs_cis)
         xk = apply_rotary_emb(xk, freqs_cis)
 
@@ -253,11 +253,11 @@ class Attention(nn.Module):
         keys = keys.repeat_interleave(self.n_head // self.n_kv_head, dim=1)
         values = values.repeat_interleave(self.n_head // self.n_kv_head, dim=1)
         output = F.scaled_dot_product_attention(
-            xq, keys, values, 
-            attn_mask=mask, 
+            xq, keys, values,
+            attn_mask=mask,
             is_causal=True if mask is None else False, # is_causal=False is for KV cache
-            dropout_p=self.attn_dropout_p if self.training else 0)            
-        
+            dropout_p=self.attn_dropout_p if self.training else 0)
+
         output = output.transpose(1, 2).contiguous().view(bsz, seqlen, self.dim)
 
         output = self.resid_dropout(self.wo(output))
@@ -332,14 +332,14 @@ class Transformer(nn.Module):
         grid_size = int(self.block_size ** 0.5)
         assert grid_size * grid_size == self.block_size
         self.freqs_cis = precompute_freqs_cis_2d(grid_size, self.config.dim // self.config.n_head, self.config.rope_base, self.cls_token_num)
-        
+
         # KVCache
         self.max_batch_size = -1
         self.max_seq_length = -1
 
         self.initialize_weights()
 
-    def initialize_weights(self):        
+    def initialize_weights(self):
         # Initialize nn.Linear and nn.Embedding
         self.apply(self._init_weights)
 
@@ -372,10 +372,10 @@ class Transformer(nn.Module):
         self.freqs_cis = precompute_freqs_cis_2d(grid_size, self.config.dim // self.config.n_head, self.config.rope_base, self.cls_token_num)
 
     def forward(
-        self, 
-        idx: torch.Tensor, 
+        self,
+        idx: torch.Tensor,
         cond_idx: torch.Tensor,  # cond_idx_or_embed
-        input_pos:  Optional[torch.Tensor] = None, 
+        input_pos:  Optional[torch.Tensor] = None,
         targets: Optional[torch.Tensor] = None,
         mask: Optional[torch.Tensor] = None,
         valid: Optional[torch.Tensor] = None,
@@ -391,7 +391,7 @@ class Transformer(nn.Module):
                 token_embeddings = self.cls_embedding(cond_idx, train=self.training)[:,:self.cls_token_num]
             else: # decode_n_tokens(kv cache) in inference
                 token_embeddings = self.tok_embeddings(idx)
-            
+
             bs = token_embeddings.shape[0]
             mask = self.causal_mask[:bs, None, input_pos]
             h = self.tok_dropout(token_embeddings)
@@ -404,11 +404,11 @@ class Transformer(nn.Module):
         #print(f"h: {h.shape}, freqs_cis: {freqs_cis.shape}, input_pos: {input_pos}, mask: {mask.shape}")
         for layer in self.layers:
             h = layer(h, freqs_cis, input_pos, mask)
-        
+
         # output layers
         h = self.norm(h)
         logits = self.output(h).float()
-        
+
         if self.training:
             logits = logits[:, self.cls_token_num - 1:].contiguous()
 
@@ -676,6 +676,7 @@ class MultiTaskImageSpeech(nn.Module):
         self.speech_layers = nn.ModuleList(
             [TransformerSpeechBlock(self.config, dpr[i]) for i in range(n_speech_extra_layers)]
         )
+
         self.speech_norm = RMSNorm(self.config.dim, eps=self.config.norm_eps)
         self.speech_head = nn.Linear(self.config.dim, self.vocab_speech_size, bias=False)
 
@@ -903,7 +904,7 @@ def precompute_freqs_cis_2d(grid_size: int, n_elem: int, base: int = 10000, cls_
     cache_grid = torch.stack([torch.cos(freqs_grid), torch.sin(freqs_grid)], dim=-1) # (grid_size, grid_size, head_dim // 2, 2)
     cache = cache_grid.flatten(0, 1)
     cond_cache = torch.cat([torch.zeros(cls_token_num, n_elem // 2, 2), cache]) # (cls_token_num+grid_size**2, head_dim // 2, 2)
-    return cond_cache 
+    return cond_cache
 
 
 def apply_rotary_emb(x: torch.Tensor, freqs_cis: torch.Tensor):
