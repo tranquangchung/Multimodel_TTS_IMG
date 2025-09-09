@@ -288,7 +288,7 @@ class TransformerSpeechBlock(nn.Module):
         self.attention_norm = RMSNorm(config.dim, eps=config.norm_eps)
         self.ffn_norm = RMSNorm(config.dim, eps=config.norm_eps)
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
-        self.prompt_proj = nn.Linear(config.dim, 2 * config.dim)
+        # self.prompt_proj = nn.Linear(config.dim, 2 * config.dim)
         self.ffn_norm_out = RMSNorm(config.dim, eps=config.norm_eps)
 
     def forward(
@@ -677,7 +677,7 @@ class MultiTaskImageSpeech(nn.Module):
             [TransformerSpeechBlock(self.config, dpr[i]) for i in range(n_speech_extra_layers)]
         )
 
-        self.speech_norm = RMSNorm(self.config.dim, eps=self.config.norm_eps)
+        # self.speech_norm = RMSNorm(self.config.dim, eps=self.config.norm_eps)
         self.speech_head = nn.Linear(self.config.dim, self.vocab_speech_size, bias=False)
 
         max_seq_len = max(self.config.max_seq_len, 2048)
@@ -727,7 +727,7 @@ class MultiTaskImageSpeech(nn.Module):
         for layer in self.speech_layers:
             h = layer(h, freqs_cis, input_pos, mask)
 
-        h = self.speech_norm(h)
+        # h = self.speech_norm(h)
         logits = self.speech_head(h).float()
 
         loss = None
