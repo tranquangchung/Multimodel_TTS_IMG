@@ -287,14 +287,14 @@ def main():
             primary_loss_asr = torch.tensor(0.0, device=device)
             if training_tts:
                 input_ids, attention_mask, labels = process_data_forward(batch, device, task="TTS")
-                outputs = model.speech_forward(idx=input_ids, mask=attention_mask, targets=labels)
+                outputs = model.speech_dpo_forward(idx=input_ids, mask=attention_mask, targets=labels)
                 primary_loss_tts = outputs.get("loss", torch.tensor(0.0, device=device))
                 if primary_loss_tts.dim() > 0:
                     primary_loss_tts = primary_loss_tts.mean()
 
             if training_asr:
                 input_ids, attention_mask, labels = process_data_forward(batch, device, task="ASR")
-                outputs = model.speech_forward(input_ids=input_ids, attention_mask=attention_mask, labels=labels, task="ASR")
+                outputs = model.speech_dpo_forward(input_ids=input_ids, attention_mask=attention_mask, labels=labels, task="ASR")
                 primary_loss_asr = outputs.get("loss", torch.tensor(0.0, device=device))
                 if primary_loss_asr.dim() > 0:
                     primary_loss_asr = primary_loss_asr.mean()
@@ -339,14 +339,14 @@ def main():
                         primary_loss_asr = torch.tensor(0.0, device=device)
                         if training_tts:
                             input_ids, attention_mask, labels = process_data_forward(batch, device, task="TTS")
-                            outputs = model.speech_forward(idx=input_ids, mask=attention_mask, targets=labels)
+                            outputs = model.speech_dpo_forward(idx=input_ids, mask=attention_mask, targets=labels)
                             primary_loss_tts = outputs.get("loss", torch.tensor(0.0, device=device))
                             if primary_loss_tts.dim() > 0:
                                 primary_loss_tts = primary_loss_tts.mean()
 
                         if training_asr:
                             input_ids, attention_mask, labels = process_data_forward(batch, device, task="ASR")
-                            outputs = model.speech_forward(input_ids=input_ids, attention_mask=attention_mask,
+                            outputs = model.speech_dpo_forward(input_ids=input_ids, attention_mask=attention_mask,
                                             labels=labels, task="ASR")
                             primary_loss_asr = outputs.get("loss", torch.tensor(0.0, device=device))
                             if primary_loss_asr.dim() > 0:

@@ -288,8 +288,6 @@ class TransformerSpeechBlock(nn.Module):
         self.attention_norm = RMSNorm(config.dim, eps=config.norm_eps)
         self.ffn_norm = RMSNorm(config.dim, eps=config.norm_eps)
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
-        # self.prompt_proj = nn.Linear(config.dim, 2 * config.dim)
-        self.ffn_norm_out = RMSNorm(config.dim, eps=config.norm_eps)
 
     def forward(
         self, x: torch.Tensor, freqs_cis: torch.Tensor, start_pos: int,
@@ -297,7 +295,7 @@ class TransformerSpeechBlock(nn.Module):
     ):
         h = x + self.drop_path(self.attention(self.attention_norm(x), freqs_cis, start_pos, mask))
         out = h + self.drop_path(self.feed_forward(self.ffn_norm(h)))
-        return self.ffn_norm_out(out)
+        return out
 
 class Transformer(nn.Module):
     def __init__(self, config: ModelArgs):
@@ -700,12 +698,54 @@ class MultiTaskImageSpeech(nn.Module):
             bl.attention.kv_cache = None
 
     # -------------------- Speech API --------------------
-    def speech_forward(
-        self,
-        idx: torch.Tensor,
-        targets: Optional[torch.Tensor] = None,
-        input_pos: Optional[torch.Tensor] = None,
-        mask: Optional[torch.Tensor] = None,
+    # def speech_forward(
+    #     self,
+    #     idx: torch.Tensor,
+    #     targets: Optional[torch.Tensor] = None,
+    #     input_pos: Optional[torch.Tensor] = None,
+    #     mask: Optional[torch.Tensor] = None,
+    # ):
+    #     p = next(self.img.parameters())
+    #     h = self.text_embeddings(idx).to(device=p.device, dtype=p.dtype)
+    #     seq_len = h.shape[1]
+    #     freqs_cis = self.speech_freqs_cis[:seq_len].to(device=h.device, dtype=h.dtype)
+    #
+    #     # Forward through image backbone (with grad depending on mode)
+    #     if self.image_backbone_tuning_mode != "frozen":
+    #         # Allow gradients if finetune or LoRA
+    #         for layer in self.img.layers:
+    #             h = layer(h, freqs_cis, input_pos, mask)
+    #     else:
+    #         # Frozen: no grad
+    #         with torch.no_grad():
+    #             for layer in self.img.layers:
+    #                 h = layer(h, freqs_cis, input_pos, mask)
+    #
+    #     # Extra speech-only layers
+    #     for layer in self.speech_layers:
+    #         h = layer(h, freqs_cis, input_pos, mask)
+    #     pdb.set_trace()
+    #     h = self.speech_norm(h)
+    #     logits = self.speech_head(h).float()
+    #
+    #     loss = None
+    #     if targets is not None:
+    #         logits_shift = logits[:, :-1, :].contiguous()
+    #         targets_shift = targets[:, 1:].contiguous()
+    #         loss = F.cross_entropy(
+    #             logits_shift.view(-1, logits_shift.size(-1)),
+    #             targets_shift.view(-1),
+    #             ignore_index=-100
+    #         )
+    #
+    #     return {"loss": loss, "logits": logits}
+
+    def speech_dpo_forward(
+            self,
+            idx: torch.Tensor,
+            targets: Optional[torch.Tensor] = None,
+            input_pos: Optional[torch.Tensor] = None,
+            mask: Optional[torch.Tensor] = None,
     ):
         p = next(self.img.parameters())
         h = self.text_embeddings(idx).to(device=p.device, dtype=p.dtype)
@@ -732,15 +772,26 @@ class MultiTaskImageSpeech(nn.Module):
 
         loss = None
         if targets is not None:
+            # Logits shifted for calculating loss and target shifted
             logits_shift = logits[:, :-1, :].contiguous()
             targets_shift = targets[:, 1:].contiguous()
+
+            # Cross-entropy loss for the standard training
             loss = F.cross_entropy(
                 logits_shift.view(-1, logits_shift.size(-1)),
                 targets_shift.view(-1),
                 ignore_index=-100
             )
 
-        return {"loss": loss, "logits": logits}
+        # DPO Loss: Calculate the DPO loss based on the log-probabilities
+        chosen_logits = logits[:idx.shape[0]]
+        rejected_logits = logits[idx.shape[0]:]
+        chosen_lm_target = targets[:idx.shape[0]]
+        rejected_lm_target = targets[idx.shape[0]:]
+
+
+
+        return {"loss": loss, "logits": logits, "chosen_logps": chosen_logps, "rejected_logps": rejected_logps}
 
     @torch.no_grad()
     def speech_generate(
