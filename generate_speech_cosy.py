@@ -362,7 +362,7 @@ def inference(config):
         for k, v in checkpoint['model'].items():
             new_state_dict[k.replace('module.', '')] = v
         checkpoint['model'] = new_state_dict
-    model.load_state_dict(checkpoint['model'], strict=True)
+    model.load_state_dict(checkpoint['model'], strict=False)
     print(f"{GREEN}Model loaded from {pretrained_checkpoint}{RESET}")
     ############################
     lang = "English"  # Default language

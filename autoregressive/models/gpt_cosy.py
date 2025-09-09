@@ -677,7 +677,7 @@ class MultiTaskImageSpeech(nn.Module):
             [TransformerSpeechBlock(self.config, dpr[i]) for i in range(n_speech_extra_layers)]
         )
 
-        # self.speech_norm = RMSNorm(self.config.dim, eps=self.config.norm_eps)
+        self.speech_norm = RMSNorm(self.config.dim, eps=self.config.norm_eps)
         self.speech_head = nn.Linear(self.config.dim, self.vocab_speech_size, bias=False)
 
         max_seq_len = max(self.config.max_seq_len, 2048)
@@ -727,7 +727,7 @@ class MultiTaskImageSpeech(nn.Module):
         for layer in self.speech_layers:
             h = layer(h, freqs_cis, input_pos, mask)
 
-        # h = self.speech_norm(h)
+        h = self.speech_norm(h)
         logits = self.speech_head(h).float()
 
         loss = None
