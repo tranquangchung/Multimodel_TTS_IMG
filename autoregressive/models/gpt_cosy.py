@@ -279,6 +279,25 @@ class TransformerBlock(nn.Module):
         out = h + self.drop_path(self.feed_forward(self.ffn_norm(h)))
         return out
 
+class TransformerSpeechBlock(nn.Module):
+    def __init__(self, config: ModelArgs, drop_path: float):
+        super().__init__()
+        self.config_dim = config.dim
+        self.attention = Attention(config)
+        self.feed_forward = FeedForward(config)
+        self.attention_norm = RMSNorm(config.dim, eps=config.norm_eps)
+        self.ffn_norm = RMSNorm(config.dim, eps=config.norm_eps)
+        self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+        self.ffn_norm_out = RMSNorm(config.dim, eps=config.norm_eps)
+
+    def forward(
+        self, x: torch.Tensor, freqs_cis: torch.Tensor, start_pos: int,
+            mask: Optional[torch.Tensor] = None,
+            style_embeddings: Optional[torch.Tensor] = None
+    ):
+        h = x + self.drop_path(self.attention(self.attention_norm(x), freqs_cis, start_pos, mask))
+        out = h + self.drop_path(self.feed_forward(self.ffn_norm(h)))
+        return self.ffn_norm_out(out)
 
 class Transformer(nn.Module):
     def __init__(self, config: ModelArgs):

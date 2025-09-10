@@ -290,7 +290,6 @@ class TransformerSpeechBlock(nn.Module):
         self.ffn_norm = RMSNorm(config.dim, eps=config.norm_eps)
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.prompt_proj = nn.Linear(config.dim, 2 * config.dim)
-        self.ffn_norm_out = RMSNorm(config.dim, eps=config.norm_eps)
 
     def forward(
         self, x: torch.Tensor, freqs_cis: torch.Tensor, start_pos: int,
@@ -302,7 +301,31 @@ class TransformerSpeechBlock(nn.Module):
             x = x * gramma.unsqueeze(1)  + beta.unsqueeze(1)
         h = x + self.drop_path(self.attention(self.attention_norm(x), freqs_cis, start_pos, mask))
         out = h + self.drop_path(self.feed_forward(self.ffn_norm(h)))
-        return self.ffn_norm_out(out)
+        return out
+
+# class TransformerSpeechBlock(nn.Module):
+#     def __init__(self, config: ModelArgs, drop_path: float):
+#         super().__init__()
+#         self.config_dim = config.dim
+#         self.attention = Attention(config)
+#         self.feed_forward = FeedForward(config)
+#         self.attention_norm = RMSNorm(config.dim, eps=config.norm_eps)
+#         self.ffn_norm = RMSNorm(config.dim, eps=config.norm_eps)
+#         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+#         self.prompt_proj = nn.Linear(config.dim, 2 * config.dim)
+#         self.ffn_norm_out = RMSNorm(config.dim, eps=config.norm_eps)
+#
+#     def forward(
+#         self, x: torch.Tensor, freqs_cis: torch.Tensor, start_pos: int,
+#             mask: Optional[torch.Tensor] = None,
+#             style_embeddings: Optional[torch.Tensor] = None
+#     ):
+#         if style_embeddings is not None:
+#             gramma, beta = self.prompt_proj(style_embeddings).split(self.config_dim, dim=-1)
+#             x = x * gramma.unsqueeze(1)  + beta.unsqueeze(1)
+#         h = x + self.drop_path(self.attention(self.attention_norm(x), freqs_cis, start_pos, mask))
+#         out = h + self.drop_path(self.feed_forward(self.ffn_norm(h)))
+#         return self.ffn_norm_out(out)
 
 
 class Transformer(nn.Module):
@@ -682,6 +705,9 @@ class MultiTaskImageSpeech(nn.Module):
         self.speech_layers = nn.ModuleList(
             [TransformerSpeechBlock(self.config, dpr[i]) for i in range(n_speech_extra_layers)]
         )
+        # self.speech_layers = nn.ModuleList(
+        #     [TransformerBlock(self.config, dpr[i]) for i in range(n_speech_extra_layers)]
+        # )
         self.speech_norm = RMSNorm(self.config.dim, eps=self.config.norm_eps)
         self.speech_head = nn.Linear(self.config.dim, self.vocab_speech_size, bias=False)
 
