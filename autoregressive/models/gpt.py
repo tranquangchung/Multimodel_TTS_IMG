@@ -418,7 +418,6 @@ class TransformerSpeech(nn.Module):
         self.num_classes = config.num_classes
         self.model_type = config.model_type
         self.cls_token_num = config.cls_token_num
-
         self.text_embeddings = nn.Embedding(self.vocab_size, config.dim)
 
         # transformer blocks
@@ -950,8 +949,7 @@ def GPT_B(**kwargs):
     return Transformer(ModelArgs(n_layer=12, n_head=12, dim=768, **kwargs)) # 111M
 
 def GPT_XXL_speech(**kwargs):
-    # return TransformerSpeech(ModelArgs(n_layer=36, n_head=20, dim=1280, **kwargs)) # 1.4B
-    return TransformerSpeech(ModelArgs(n_layer=8, n_head=20, dim=1280, **kwargs)) # 1.4B
+    return TransformerSpeech(ModelArgs(n_head=20, dim=1280, **kwargs)) # 1.4B
 
 def GPT_Small_speech(**kwargs):
     return TransformerSpeech(ModelArgs(n_layer=2, n_head=20, dim=1280, **kwargs)) # 1.4B

@@ -157,30 +157,12 @@ def main():
 
     latent_size = config['model_config']['image_size'] // config['model_config']['downsample_size']
     model = GPT_XXL_speech(
+        n_layer=config['speech_config']['n_speech_extra_layers'],
         block_size=latent_size ** 2,
         vocab_size=config['model_config']['vocab_size'],
         cls_token_num=config['model_config']['cls_token_num'],
         model_type=config['model_config']['gpt_type'],
     ).to(device)
-
-    # latent_size = config['model_config']['image_size'] // config['model_config']['downsample_size']
-    # model = GPT_Small_speech(
-    #     block_size=latent_size ** 2,
-    #     vocab_size=config['model_config']['vocab_size'],
-    #     cls_token_num=config['model_config']['cls_token_num'],
-    #     model_type=config['model_config']['gpt_type'],
-    # ).to(device)
-    # model = model.to(device)
-
-    # pretrained_path = "/home/ldap-users/s2220411/Code/new_explore_multimodel/smolGPT/out2/ckpt.pt"
-    # weight = torch.load(pretrained_path, map_location=device)
-    # # Load the model weights
-    # remove_key = ["text_embeddings.weight", "speech_output.weight"]
-    # for key in remove_key:
-    #     if key in weight['model']:
-    #         del weight['model'][key]
-    # # Initialize the model with the loaded weights
-    # model.load_state_dict(weight['model'], strict=False)
 
     logger.info(model)
     # Wrap the model with DDP
