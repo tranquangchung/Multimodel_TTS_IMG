@@ -37,12 +37,12 @@
 #  --configs_training configs_model/$config_name/configs_training.yaml \
 #  --config_model configs_model/$config_name \
 
-#config_name=configs_gpt
-#CUDA_VISIBLE_DEVICES=2 torchrun --master_port=29502 --nproc_per_node=1 --nnodes=1 --node_rank=0 autoregressive/train/train_t2s.py \
-#  --configs_training configs_model/$config_name/configs_training.yaml \
-#  --config_model configs_model/$config_name \
-
 config_name=configs_gpt
-CUDA_VISIBLE_DEVICES=1 torchrun --master_port=29001 --nproc_per_node=1 --nnodes=1 --node_rank=0 autoregressive/train/train_t2is.py \
+CUDA_VISIBLE_DEVICES=1 torchrun --master_port=29501 --nproc_per_node=1 --nnodes=1 --node_rank=0 autoregressive/train/train_t2s.py \
   --configs_training configs_model/$config_name/configs_training.yaml \
   --config_model configs_model/$config_name \
+
+#config_name=configs_gpt
+#CUDA_VISIBLE_DEVICES=1 torchrun --master_port=29001 --nproc_per_node=1 --nnodes=1 --node_rank=0 autoregressive/train/train_t2is.py \
+#  --configs_training configs_model/$config_name/configs_training.yaml \
+#  --config_model configs_model/$config_name \

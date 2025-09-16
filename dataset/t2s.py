@@ -153,8 +153,8 @@ class DatasetT2S(Dataset):
 
     def __getitem__(self, idx):
         item = self.data[idx]
-        source_text = remove_special_characters(item['transcript'])
-        # source_text = item['transcript']
+        # source_text = remove_special_characters(item['transcript'])
+        source_text = item['transcript']
         target_unit = item['unit']
         language_source = item['language']
         model_inputs = self.tokenizer(

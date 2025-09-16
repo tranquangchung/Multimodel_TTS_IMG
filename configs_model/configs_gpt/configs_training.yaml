@@ -3,15 +3,26 @@ model:
 tokenizer:
   name: ""
 
+#custom_data:
+#  pad_token: -100 # -100 for mBART, loss will ignore these tokens
+#  ignore_token: -100 # -100 for mBART, loss will ignore these tokens
+#  bos_tts:
+#    "English": 1000
+#  eos_tts: 1001
+#  bos_asr:
+#    "English": 1000
+#  eos_asr: 1001
+#  padding_eos: 0 # default of Qwen tokenizer
+
 custom_data:
   pad_token: -100 # -100 for mBART, loss will ignore these tokens
   ignore_token: -100 # -100 for mBART, loss will ignore these tokens
   bos_tts:
-    "English": 1000
-  eos_tts: 1001
-  bos_asr:
-    "English": 1000
-  eos_asr: 1001
+    "English": 6561
+  eos_tts: 6562
+  bos_asr: # no use
+    "English": 6563
+  eos_asr: 6564
   padding_eos: 0 # default of Qwen tokenizer
 
 task_training:
@@ -20,7 +31,8 @@ task_training:
 loss_target: TTS # TTS, ASR, or TTS_ASR
 dataset:
   path_dir:
-    - "/home/ldap-users/s2220411/Code/new_explore_tts/MachineSpeechChain_ASRU25/dataset/LibriTTS"
+    #- "/home/ldap-users/s2220411/Code/new_explore_tts/MachineSpeechChain_ASRU25/dataset/LibriTTS"
+    - "/home/ldap-users/s2220411/Code/new_explore_tts/MachineSpeechChain_ASRU25/dataset/Cosyvoice2Token/LibriTTS"
   langs:
     - "English"
   train_files:
@@ -42,9 +54,9 @@ training:
   num_workers: 6 # Number of workers for DataLoader
   evaluation_strategy: "epoch"
   learning_rate: 1e-4
-  output_dir: !ref "result/TTS_result/ImageSpeechGeneration_Final/LibriTTS_1e4_4Layer_16alpha_16rank"
-  per_device_train_batch_size: 8 #32 #10 #8 #16 #32 # 32
-  per_device_eval_batch_size: 8 #32 #10 #8 #16 #32 # 32
+  output_dir: !ref "result/TTS_result/SpeechOnly_Hubert/8Layer_LibrisTTS_Cosy"
+  per_device_train_batch_size: 14 #32 #10 #8 #16 #32 # 32
+  per_device_eval_batch_size: 14 #32 #10 #8 #16 #32 # 32
   num_train_epochs: 1000
   weight_decay: 0.01 # 0.01, 0.1, 0.3
   fp16: true
@@ -79,6 +91,7 @@ model_config:
   image_backbone_tuning_mode: 'lora' # finetune, lora, frozen
   lora_alpha: 16.0
   lora_rank: 16
+  gpt_type: t2i
 image_config:
   vocab_size: 16384
   gpt_type: t2i
@@ -87,7 +100,7 @@ speech_config:
   text_vocab_size: 32100
   vocab_speech_size: 1002
   hidden_size: 512
-  n_speech_extra_layers: 4
+  n_speech_extra_layers: 8
   freeze_image_backbone: True
 
 

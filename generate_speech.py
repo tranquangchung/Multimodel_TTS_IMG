@@ -183,8 +183,9 @@ def perform_inference(model, tokenizer, test_data, device, generator, vocoder, c
     # tokenizer.src_lang = lang_code
     start_time = time.time()
     for index, item in tqdm(enumerate(test_data)):
-        text_source = remove_special_characters(item['transcript'])
+        # text_source = remove_special_characters(item['transcript'])
         # text_source = remove_special_characters(text_sources[index % len(text_sources)])
+        text_source = item['transcript']
         audio_path = item['audio_path']
         file_name = os.path.basename(audio_path).split(".")[0]
         encoded_inputs = tokenizer(text_source, return_tensors='pt', padding=True, truncation=True).to(device)
@@ -281,26 +282,36 @@ def inference(config):
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
     latent_size = config['model_config']['image_size'] // config['model_config']['downsample_size']
 
-    img_model = GPT_XL(
+    ##############################
+    # img_model = GPT_XL(
+    #     block_size=latent_size ** 2,
+    #     vocab_size=config['image_config']['vocab_size'],
+    #     cls_token_num=config['image_config']['cls_token_num'],
+    #     model_type=config['image_config']['gpt_type'],
+    # ).to(device)
+    # # Load the model weights
+    # img_model_path = "/home/ldap-users/s2220411/Code/new_explore_multimodel/LlamaGen/t2i_XL_stage2_512.pt"
+    # checkpoint = torch.load(img_model_path, map_location="cpu")
+    # img_model.load_state_dict(checkpoint['model'], strict=True)
+    #
+    # model = MultiTaskImageSpeech(
+    #     pretrained_image_model=img_model,
+    #     text_vocab_size=config['speech_config']['text_vocab_size'],
+    #     speech_vocab_size=config['speech_config']['vocab_speech_size'],
+    #     n_speech_extra_layers=config['speech_config']['n_speech_extra_layers'],
+    #     image_backbone_tuning_mode=config['model_config']['image_backbone_tuning_mode'],
+    #     lora_alpha=config['model_config']['lora_alpha'],
+    #     lora_rank=config['model_config']['lora_rank'],
+    # )
+    ##############################
+    latent_size = config['model_config']['image_size'] // config['model_config']['downsample_size']
+    model = GPT_XXL_speech(
         block_size=latent_size ** 2,
-        vocab_size=config['image_config']['vocab_size'],
-        cls_token_num=config['image_config']['cls_token_num'],
-        model_type=config['image_config']['gpt_type'],
+        vocab_size=config['model_config']['vocab_size'],
+        cls_token_num=config['model_config']['cls_token_num'],
+        model_type=config['model_config']['gpt_type'],
     ).to(device)
-    # Load the model weights
-    img_model_path = "/home/ldap-users/s2220411/Code/new_explore_multimodel/LlamaGen/t2i_XL_stage2_512.pt"
-    checkpoint = torch.load(img_model_path, map_location="cpu")
-    img_model.load_state_dict(checkpoint['model'], strict=True)
-
-    model = MultiTaskImageSpeech(
-        pretrained_image_model=img_model,
-        text_vocab_size=config['speech_config']['text_vocab_size'],
-        speech_vocab_size=config['speech_config']['vocab_speech_size'],
-        n_speech_extra_layers=config['speech_config']['n_speech_extra_layers'],
-        image_backbone_tuning_mode=config['model_config']['image_backbone_tuning_mode'],
-        lora_alpha=config['model_config']['lora_alpha'],
-        lora_rank=config['model_config']['lora_rank'],
-    )
+    ##############################
 
     print(model)
     model.eval()

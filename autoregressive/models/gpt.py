@@ -429,7 +429,8 @@ class TransformerSpeech(nn.Module):
 
         # output layer
         self.norm = RMSNorm(config.dim, eps=config.norm_eps)
-        self.config.vocab_speech_size = 1002
+        # self.config.vocab_speech_size = 1002
+        self.config.vocab_speech_size = 6563
         self.speech_output = nn.Linear(config.dim, self.config.vocab_speech_size, bias=False)
 
         max_seq_len = 2048
@@ -461,9 +462,6 @@ class TransformerSpeech(nn.Module):
         freqs_cis = self.freqs_cis[:seq_len].to(h.device)
         # Forward through layers
         for layer in self.layers:
-            if targets is not None:
-                h = layer(h, freqs_cis, input_pos, None)
-            else:
                 h = layer(h, freqs_cis, input_pos, mask)
         h = self.norm(h)
         logits = self.speech_output(h).float()
@@ -487,7 +485,7 @@ class TransformerSpeech(nn.Module):
         return return_dict
 
     @torch.no_grad()
-    def generate(
+    def speech_generate(
         self, idx, max_new_tokens, temperature=1.0, top_k=None, top_p=None, min_p=None
     ):
         for _ in range(max_new_tokens):
