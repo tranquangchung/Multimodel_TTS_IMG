@@ -38,6 +38,8 @@ from torch.nn.attention.flex_attention import (
     flex_attention,
 )
 from autoregressive.models.generate import generate as generate_img_fn
+import torch.nn.functional as F
+
 
 def find_multiple(n: int, k: int):
     if n % k == 0:
@@ -279,25 +281,285 @@ class TransformerBlock(nn.Module):
         out = h + self.drop_path(self.feed_forward(self.ffn_norm(h)))
         return out
 
+class CrossAttention(nn.Module):
+    def __init__(self, dim: int, n_head: int, attn_p: float=0.0, resid_p: float=0.0):
+        super().__init__()
+        assert dim % n_head == 0
+        self.n_head, self.head_dim = n_head, dim // n_head
+        self.q = nn.Linear(dim, dim, bias=False)
+        self.k = nn.Linear(dim, dim, bias=False)
+        self.v = nn.Linear(dim, dim, bias=False)
+        self.o = nn.Linear(dim, dim, bias=False)
+        self.resid_dropout = nn.Dropout(resid_p)
+        self.attn_p = attn_p
+
+    def forward(self, x, kv):                     # x: [B,T,D], kv: [B,S,D]
+        B,T,D = x.size(); H=self.n_head; d=self.head_dim
+        q = self.q(x).view(B,T,H,d).transpose(1,2)
+        k = self.k(kv).view(B,-1,H,d).transpose(1,2)
+        v = self.v(kv).view(B,-1,H,d).transpose(1,2)
+        y = F.scaled_dot_product_attention(q,k,v, is_causal=False,
+                                           dropout_p=self.attn_p if self.training else 0.0)
+        y = y.transpose(1,2).contiguous().view(B,T,D)
+        return self.resid_dropout(self.o(y))
+
+# class TransformerSpeechBlock(nn.Module):
+#     def __init__(self, config: ModelArgs, drop_path: float):
+#         super().__init__()
+#         self.attention = Attention(config)                        # giữ nguyên
+#         self.cross_attn = CrossAttention(config.dim, config.n_head,
+#                                          config.attn_dropout_p, config.resid_dropout_p)
+#         self.feed_forward = FeedForward(config)
+#         self.attention_norm = RMSNorm(config.dim, eps=config.norm_eps)
+#         self.cross_norm = RMSNorm(config.dim, eps=config.norm_eps)
+#         self.ffn_norm = RMSNorm(config.dim, eps=config.norm_eps)
+#         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+#
+#     def forward(self, x, freqs_cis, start_pos, mask=None, style_embeddings=None):
+#         h = x + self.drop_path(self.attention(self.attention_norm(x), freqs_cis, start_pos, mask))
+#         if style_embeddings is not None:                      # style_embeddings: [B,D]
+#             kv = style_embeddings.unsqueeze(1)                # -> [B,1,D]
+#             h = h + self.drop_path(self.cross_attn(self.cross_norm(h), kv))
+#         return h + self.drop_path(self.feed_forward(self.ffn_norm(h)))
+
+# class TransformerSpeechBlock(nn.Module):
+#     def __init__(self, config: ModelArgs, drop_path: float):
+#         super().__init__()
+#         self.attention = Attention(config)  # giữ nguyên self-attention
+#         self.cross_attn = CrossAttention(config.dim, config.n_head, config.attn_dropout_p, config.resid_dropout_p)
+#         self.feed_forward = FeedForward(config)
+#         self.attention_norm = RMSNorm(config.dim, eps=config.norm_eps)
+#         self.cross_norm = RMSNorm(config.dim, eps=config.norm_eps)
+#         self.ffn_norm = RMSNorm(config.dim, eps=config.norm_eps)
+#         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+#
+#         # FiLM projection cho style_embeddings
+#         self.prompt_proj = nn.Linear(config.dim, 2 * config.dim)  # FiLM projection
+#         self.config_dim = config.dim
+#
+#     def forward(self, x, freqs_cis, start_pos, mask=None, style_embeddings=None):
+#         h = x + self.drop_path(self.attention(self.attention_norm(x), freqs_cis, start_pos, mask))
+#         if style_embeddings is not None:
+#             kv = style_embeddings.unsqueeze(1)  # Convert style_embeddings: [B, D] -> [B, 1, D]
+#             h = h + self.drop_path(self.cross_attn(self.cross_norm(h), kv))
+#         if style_embeddings is not None:
+#             gramma, beta = self.prompt_proj(style_embeddings).split(self.config_dim, dim=-1)
+#             style = h * gramma.unsqueeze(1) + beta.unsqueeze(1)  # FiLM điều chỉnh hidden states
+#             h = h + style  # Kết hợp với hidden states ban đầu
+#         return h + self.drop_path(self.feed_forward(self.ffn_norm(h)))
+
+# class TransformerSpeechBlock(nn.Module):
+#     def __init__(self, config: ModelArgs, drop_path: float):
+#         super().__init__()
+#         self.attention = Attention(config)  # giữ nguyên self-attention
+#         self.feed_forward = FeedForward(config)
+#         self.attention_norm = RMSNorm(config.dim, eps=config.norm_eps)
+#         self.cross_norm = RMSNorm(config.dim, eps=config.norm_eps)
+#         self.ffn_norm = RMSNorm(config.dim, eps=config.norm_eps)
+#         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+#
+#         # FiLM projection cho style_embeddings
+#         self.prompt_proj = nn.Linear(config.dim, 2 * config.dim)  # FiLM projection
+#         self.config_dim = config.dim
+#
+#     def forward(self, x, freqs_cis, start_pos, mask=None, style_embeddings=None):
+#         h = x + self.drop_path(self.attention(self.attention_norm(x), freqs_cis, start_pos, mask))
+#         if style_embeddings is not None:
+#             gramma, beta = self.prompt_proj(style_embeddings).split(self.config_dim, dim=-1)
+#             style = h * gramma.unsqueeze(1) + beta.unsqueeze(1)  # FiLM điều chỉnh hidden states
+#             h = h + style  # Kết hợp với hidden states ban đầu
+#         return h + self.drop_path(self.feed_forward(self.ffn_norm(h)))
+
+# class StyleAdapter(nn.Module):
+#     def __init__(self, dim, bottleneck=256, init_scale=0.2, orthogonal=True):
+#         super().__init__()
+#         self.h_norm = RMSNorm(dim); self.s_norm = RMSNorm(dim)
+#         self.down = nn.Linear(dim, bottleneck, bias=False)
+#         self.up   = nn.Linear(bottleneck, dim, bias=False)
+#         self.gate = nn.Linear(dim, dim, bias=True)
+#         self.scale = nn.Parameter(torch.tensor(init_scale))
+#         self.orthogonal = orthogonal
+#
+#     def forward(self, h, s, eps=1e-6):              # h:[B,T,D], s:[B,D]
+#         B,T,D = h.shape
+#         h_hat = self.h_norm(h)                      # giữ nội dung, làm sạch biên độ
+#         s_hat = self.s_norm(s)
+#         g = torch.sigmoid(self.gate(s_hat))         # [B,D]
+#         delta = self.up(F.gelu(self.down(h_hat)))
+#         delta = delta * g.unsqueeze(1)                     # gate theo kênh
+#
+#         # match biên độ với h
+#         rms_h = h.pow(2).mean(dim=[1,2], keepdim=True).sqrt()
+#         rms_d = delta.pow(2).mean(dim=[1,2], keepdim=True).sqrt()
+#         delta = self.scale * (rms_h / (rms_d + eps)) * delta
+#
+#         if self.orthogonal:
+#             # bỏ thành phần song song h để đỡ méo nghĩa
+#             dot = (delta * h).sum(dim=2, keepdim=True)          # [B,T,1]
+#             hh  = (h.pow(2).sum(dim=2, keepdim=True) + eps)     # [B,T,1]
+#             delta = delta - (dot / hh) * h
+#
+#         return h + delta
+#
+# class StyleAdapterV2(nn.Module):
+#     def __init__(self, dim, bottleneck=256, init_scale=0.5, orthogonal=True):
+#         super().__init__()
+#         self.h_norm = RMSNorm(dim)
+#         self.s_norm = RMSNorm(dim)
+#         self.down = nn.Linear(dim, bottleneck, bias=False)
+#         self.up   = nn.Linear(bottleneck, dim, bias=False)
+#         self.gate = nn.Linear(dim, dim, bias=True)
+#         self.gain = nn.Parameter(torch.tensor(init_scale))
+#         self.orthogonal = orthogonal
+#
+#     def forward(self, h, s, eps=1e-6):
+#         B,T,D = h.shape
+#         h_hat = self.h_norm(h)
+#         s_hat = self.s_norm(s)
+#         g = torch.sigmoid(self.gate(s_hat)).unsqueeze(1)      # [B,1,D]
+#
+#         delta = self.up(F.gelu(self.down(h_hat))) * g         # [B,T,D]
+#
+#         rms_h = (h.pow(2).mean(dim=-1, keepdim=True).sqrt())  # [B,T,1]
+#         rms_d = (delta.pow(2).mean(dim=-1, keepdim=True).sqrt())
+#         delta = self.gain * (rms_h / (rms_d + eps)) * delta
+#
+#         if self.orthogonal:
+#             dot = (delta * h).sum(dim=-1, keepdim=True)
+#             hh  = (h.pow(2).sum(dim=-1, keepdim=True) + eps)
+#             delta = delta - (dot / hh) * h
+#         return h + delta
+#
+# class TransformerSpeechBlock(nn.Module):
+#     def __init__(self, config: ModelArgs, drop_path: float):
+#         super().__init__()
+#         self.attention = Attention(config)
+#         self.feed_forward = FeedForward(config)
+#         self.attention_norm = RMSNorm(config.dim, eps=config.norm_eps)
+#         self.ffn_norm = RMSNorm(config.dim, eps=config.norm_eps)
+#         self.drop_path = DropPath(drop_path) if drop_path>0 else nn.Identity()
+#         self.adapter = StyleAdapterV2(config.dim, bottleneck=max(32, config.dim//4),
+#                                     init_scale=0.2, orthogonal=True)
+#
+#     def forward(self, x, freqs_cis, start_pos, mask=None, style_embeddings=None):
+#         h = x + self.drop_path(self.attention(self.attention_norm(x), freqs_cis, start_pos, mask))
+#         if style_embeddings is not None:
+#             h = self.adapter(h, style_embeddings)  # mạnh vừa đủ, giữ nội dung
+#         return h + self.drop_path(self.feed_forward(self.ffn_norm(h)))
+
+
+# class TransformerSpeechBlock(nn.Module):
+#     def __init__(self, config: ModelArgs, drop_path: float):
+#         super().__init__()
+#         self.attention = Attention(config)  # giữ nguyên self-attention
+#         self.feed_forward = FeedForward(config)
+#         self.attention_norm = RMSNorm(config.dim, eps=config.norm_eps)
+#         self.cross_norm = RMSNorm(config.dim, eps=config.norm_eps)
+#         self.ffn_norm = RMSNorm(config.dim, eps=config.norm_eps)
+#         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+#
+#         self.prompt_proj = nn.Linear(config.dim, 2 * config.dim)  # FiLM projection
+#         self.config_dim = config.dim
+#
+#         self.style_norm  = RMSNorm(config.dim)
+#         self.gamma_scale = nn.Parameter(torch.tensor(0.1))   # học được
+#         self.beta_scale  = nn.Parameter(torch.tensor(0.1))   # học được
+#         self.h_coeff     = nn.Parameter(torch.tensor(0.6))   # mix hệ gốc
+#         self.delta_coeff = nn.Parameter(torch.tensor(0.8))   # mix phần style
+#
+#     @staticmethod
+#     def _rms(x, dim=-1, keepdim=True):
+#         return (x.pow(2).mean(dim=dim, keepdim=keepdim).sqrt())
+#
+#     def forward(self, x, freqs_cis, start_pos, mask=None, style_embeddings=None, index=None):
+#         h = x + self.drop_path(self.attention(self.attention_norm(x), freqs_cis, start_pos, mask))
+#
+#         if style_embeddings is not None:
+#             g_raw, b_raw = self.prompt_proj(self.style_norm(style_embeddings)).split(self.config_dim, dim=-1)
+#             gamma = 1.0 + self.gamma_scale * torch.tanh(g_raw)      # [B,D]
+#             beta  =        self.beta_scale  * torch.tanh(b_raw)      # [B,D]
+#             style = gamma.unsqueeze(1) * h + beta.unsqueeze(1)       # [B,T,D]
+#             rms_h = self._rms(h)                 # [B,T,1]
+#             rms_s = self._rms(style) + 1e-6      # [B,T,1]
+#             style = (rms_h / rms_s) * style
+#             h = self.h_coeff * h + self.delta_coeff * self.drop_path(style)
+#         out = self.drop_path(self.feed_forward(self.ffn_norm(h)))
+#         return out
+
 class TransformerSpeechBlock(nn.Module):
     def __init__(self, config: ModelArgs, drop_path: float):
         super().__init__()
-        self.config_dim = config.dim
-        self.attention = Attention(config)
+        self.attention = Attention(config)  # giữ nguyên self-attention
         self.feed_forward = FeedForward(config)
         self.attention_norm = RMSNorm(config.dim, eps=config.norm_eps)
+        self.cross_norm = RMSNorm(config.dim, eps=config.norm_eps)
         self.ffn_norm = RMSNorm(config.dim, eps=config.norm_eps)
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
-        self.ffn_norm_out = RMSNorm(config.dim, eps=config.norm_eps)
 
-    def forward(
-        self, x: torch.Tensor, freqs_cis: torch.Tensor, start_pos: int,
-            mask: Optional[torch.Tensor] = None,
-            style_embeddings: Optional[torch.Tensor] = None
-    ):
+        self.prompt_proj = nn.Linear(config.dim, 2 * config.dim)  # FiLM projection
+        self.config_dim = config.dim
+
+        self.style_norm  = RMSNorm(config.dim)
+        self.h_coeff     = nn.Parameter(torch.tensor(0.5))   # mix hệ gốc
+
+    @staticmethod
+    def _rms(x, dim=-1, keepdim=True):
+        return (x.pow(2).mean(dim=dim, keepdim=keepdim).sqrt())
+
+    def forward(self, x, freqs_cis, start_pos, mask=None, style_embeddings=None, index=None):
         h = x + self.drop_path(self.attention(self.attention_norm(x), freqs_cis, start_pos, mask))
-        out = h + self.drop_path(self.feed_forward(self.ffn_norm(h)))
-        return self.ffn_norm_out(out)
+
+        if style_embeddings is not None:
+            gamma, beta = self.prompt_proj(self.style_norm(style_embeddings)).split(self.config_dim, dim=-1)
+            style = gamma.unsqueeze(1) * h + beta.unsqueeze(1)       # [B,T,D]
+            rms_h = self._rms(h)                 # [B,T,1]
+            rms_s = self._rms(style) + 1e-6      # [B,T,1]
+            style = (rms_h / rms_s) * style
+            h = self.h_coeff * h + (1-self.h_coeff) * self.drop_path(style)
+        out = self.drop_path(self.feed_forward(self.ffn_norm(h)))
+        if index is not None and index < 3:
+            return out
+        else:
+            return h + out
+
+# class TransformerSpeechBlock(nn.Module):
+#     def __init__(self, config: ModelArgs, drop_path: float):
+#         super().__init__()
+#         self.attention = Attention(config)  # giữ nguyên self-attention
+#         self.feed_forward = FeedForward(config)
+#         self.attention_norm = RMSNorm(config.dim, eps=config.norm_eps)
+#         self.cross_norm = RMSNorm(config.dim, eps=config.norm_eps)
+#         self.ffn_norm = RMSNorm(config.dim, eps=config.norm_eps)
+#         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
+#
+#         self.prompt_proj = nn.Linear(config.dim, 2 * config.dim)  # FiLM projection
+#         self.config_dim = config.dim
+#
+#         self.style_norm  = RMSNorm(config.dim)
+#         # self.gamma_scale = nn.Parameter(torch.tensor(0.1))   # học được
+#         # self.beta_scale  = nn.Parameter(torch.tensor(0.1))   # học được
+#         self.h_coeff     = nn.Parameter(torch.tensor(0.6))   # mix hệ gốc
+#         self.delta_coeff = nn.Parameter(torch.tensor(0.8))   # mix phần style
+#
+#     @staticmethod
+#     def _rms(x, dim=-1, keepdim=True):
+#         return (x.pow(2).mean(dim=dim, keepdim=keepdim).sqrt())
+#
+#     def forward(self, x, freqs_cis, start_pos, mask=None, style_embeddings=None):
+#         h = x + self.drop_path(self.attention(self.attention_norm(x), freqs_cis, start_pos, mask))
+#
+#         if style_embeddings is not None:
+#             g_raw, b_raw = self.prompt_proj(self.style_norm(style_embeddings)).split(self.config_dim, dim=-1)
+#             gamma = 1.0 + torch.tanh(g_raw)      # [B,D]
+#             beta  =       torch.tanh(b_raw)      # [B,D]
+#             style = gamma.unsqueeze(1) * h + beta.unsqueeze(1)       # [B,T,D]
+#             rms_h = self._rms(h)                 # [B,T,1]
+#             rms_s = self._rms(style) + 1e-6      # [B,T,1]
+#             style = (rms_h / rms_s) * style
+#             h = self.h_coeff * h + (1-self.h_coeff) * self.drop_path(style)
+#         out = self.drop_path(self.feed_forward(self.ffn_norm(h)))
+#         return h + out
+
 
 class Transformer(nn.Module):
     def __init__(self, config: ModelArgs):
@@ -428,36 +690,33 @@ class Transformer(nn.Module):
         return list(self.layers)
 
 class TransformerSpeech(nn.Module):
-    def __init__(
-            self,
-            config,
-            config_model: ModelArgs,
-            text_vocab_size: int = 16384,
-            speech_vocab_size: int = 1002,
-            n_speech_extra_layers: int = 4,
-    ):
+    def __init__(self, config: ModelArgs):
         super().__init__()
         self.config = config
-        self.config_model = config_model
-        self.text_vocab_size = text_vocab_size
-        self.speech_vocab_size = speech_vocab_size
+        self.vocab_size = config.vocab_size
+        self.n_layer = config.n_layer
+        self.block_size = config.block_size
+        self.num_classes = config.num_classes
+        self.model_type = config.model_type
+        self.cls_token_num = config.cls_token_num
 
-        self.text_embeddings = nn.Embedding(self.text_vocab_size, config_model.dim)
+        self.text_embeddings = nn.Embedding(self.vocab_size, config.dim)
 
         # transformer blocks
-        dpr = [x.item() for x in torch.linspace(0, config_model.drop_path_rate, n_speech_extra_layers)]
-        self.layers = nn.ModuleList(
-            [TransformerBlock(config_model, dpr[i]) for i in range(n_speech_extra_layers)]
-        )
+        dpr = [x.item() for x in torch.linspace(0, config.drop_path_rate, config.n_layer)]
+        self.layers = torch.nn.ModuleList()
+        for layer_id in range(config.n_layer):
+            self.layers.append(TransformerBlock(config, dpr[layer_id]))
 
         # output layer
-        self.norm = RMSNorm(config_model.dim, eps=config_model.norm_eps)
-        self.speech_output = nn.Linear(config_model.dim, speech_vocab_size, bias=False)
+        self.norm = RMSNorm(config.dim, eps=config.norm_eps)
+        self.config.vocab_speech_size = 1002
+        self.speech_output = nn.Linear(config.dim, self.config.vocab_speech_size, bias=False)
 
         max_seq_len = 2048
         self.freqs_cis = precompute_freqs_cis(
             seq_len=max_seq_len,
-            n_elem=config_model.dim // config_model.n_head,
+            n_elem=config.dim // config.n_head,
             base=10000,
             dtype=torch.float32,
             rope_scaling=None,  # No scaling for now
@@ -465,8 +724,8 @@ class TransformerSpeech(nn.Module):
         print("Shape of freqs_cis:", self.freqs_cis.shape)
 
         # KVCache
-        # self.max_batch_size = -1
-        # self.max_seq_length = -1
+        self.max_batch_size = -1
+        self.max_seq_length = -1
 
     def forward(
             self,
@@ -483,19 +742,23 @@ class TransformerSpeech(nn.Module):
         freqs_cis = self.freqs_cis[:seq_len].to(h.device)
         # Forward through layers
         for layer in self.layers:
+            if targets is not None:
+                h = layer(h, freqs_cis, input_pos, None)
+            else:
                 h = layer(h, freqs_cis, input_pos, mask)
         h = self.norm(h)
         logits = self.speech_output(h).float()
 
         loss = None
         if targets is not None:
-            logits_shift = logits[:, :-1, :].contiguous()
-            targets_shift = targets[:, 1:].contiguous()
+            # loss = ForCausalLMLoss(logits=logits, labels=targets, vocab_size=self.config.vocab_speech_size, **kwargs)
+            logits = logits[:, :-1, :].contiguous()
+            targets = targets[:, 1:].contiguous()
             loss = F.cross_entropy(
-                logits_shift.view(-1, logits_shift.size(-1)),
-                targets_shift.view(-1),
-                ignore_index=-100
+                logits.view(-1, logits.shape[-1]), targets.view(-1), ignore_index=-100
             )
+        else:
+            return logits
 
         #######################################
         return_dict = {
@@ -505,13 +768,18 @@ class TransformerSpeech(nn.Module):
         return return_dict
 
     @torch.no_grad()
-    def speech_generate(
+    def generate(
         self, idx, max_new_tokens, temperature=1.0, top_k=None, top_p=None, min_p=None
     ):
         for _ in range(max_new_tokens):
-            context = (idx if idx.size(1) < self.config_model.block_size else idx[:, -self.config_model.block_size:])
-            out = self(context)
-            logits = out["logits"][:, -1, :] / temperature
+            context = (
+                idx
+                if idx.size(1) < self.config.block_size
+                else idx[:, -self.config.block_size :]
+            )
+            logits = self(context)
+
+            logits = logits[:, -1, :] / temperature
 
             if top_p is not None and top_p > 0.0:
                 probs = torch.softmax(logits, dim=-1)
@@ -546,7 +814,7 @@ class TransformerSpeech(nn.Module):
             probs = F.softmax(logits, dim=-1)
             idx_next = torch.multinomial(probs, num_samples=1)
 
-            if idx_next == self.speech_vocab_size - 1:
+            if idx_next == 1001:
                 break
             idx = torch.cat([idx, idx_next], dim=-1)
 
@@ -587,6 +855,7 @@ class LoRALinear(nn.Module):
 class MultiTaskImageSpeech(nn.Module):
     def __init__(
         self,
+        configs,
         pretrained_image_model: nn.Module,
         text_vocab_size: int = 16384,
         speech_vocab_size: int = 1002,
@@ -668,8 +937,11 @@ class MultiTaskImageSpeech(nn.Module):
 
         dpr = [x.item() for x in torch.linspace(0, self.config.drop_path_rate, n_speech_extra_layers)]
         self.speech_layers = nn.ModuleList(
-            [TransformerBlock(self.config, dpr[i]) for i in range(n_speech_extra_layers)]
+            [TransformerSpeechBlock(self.config, dpr[i]) for i in range(n_speech_extra_layers)]
         )
+        # self.speech_layers = nn.ModuleList(
+        #     [TransformerBlock(self.config, dpr[i]) for i in range(n_speech_extra_layers)]
+        # )
         self.speech_norm = RMSNorm(self.config.dim, eps=self.config.norm_eps)
         self.speech_head = nn.Linear(self.config.dim, self.vocab_speech_size, bias=False)
 
@@ -682,6 +954,10 @@ class MultiTaskImageSpeech(nn.Module):
             rope_scaling=None,
         )
         print("Shape of freqs_cis:", self.speech_freqs_cis.shape)
+        # project to x-dim to 1280-dim
+        self.style_proj = nn.Linear(configs['prompt_config']['style_proj_dim'], self.config.dim)
+        # self.adapter = StyleAdapterV2(self.config.dim, bottleneck=max(32, self.config.dim // 4),
+        #                               init_scale=0.2, orthogonal=True)
 
     def _set_lora(self, enabled: bool):
         for m in self.img.modules():
@@ -692,6 +968,7 @@ class MultiTaskImageSpeech(nn.Module):
         for bl in self.img.layers:
             bl.attention.kv_cache = None
 
+
     # -------------------- Speech API --------------------
     def speech_forward(
         self,
@@ -699,6 +976,7 @@ class MultiTaskImageSpeech(nn.Module):
         targets: Optional[torch.Tensor] = None,
         input_pos: Optional[torch.Tensor] = None,
         mask: Optional[torch.Tensor] = None,
+        style_embeddings: Optional[torch.Tensor] = None,
     ):
         p = next(self.img.parameters())
         h = self.text_embeddings(idx).to(device=p.device, dtype=p.dtype)
@@ -715,10 +993,16 @@ class MultiTaskImageSpeech(nn.Module):
             with torch.no_grad():
                 for layer in self.img.layers:
                     h = layer(h, freqs_cis, input_pos, mask)
-
         # Extra speech-only layers
-        for layer in self.speech_layers:
-            h = layer(h, freqs_cis, input_pos, mask)
+        if style_embeddings is not None:
+            style_embeddings = self.style_proj(style_embeddings)  # [B, 1280]
+        # add style embedding here
+        # if style_embeddings is not None:
+        #     h = h + style_embeddings.unsqueeze(1)
+        #     h = self.adapter(h, style_embeddings)
+        # add style embedding here
+        for index, layer in enumerate(self.speech_layers):
+            h = layer(h, freqs_cis, input_pos, mask, style_embeddings, index)
         h = self.speech_norm(h)
         logits = self.speech_head(h).float()
 
@@ -736,7 +1020,7 @@ class MultiTaskImageSpeech(nn.Module):
 
     @torch.no_grad()
     def speech_generate(
-        self, idx, max_new_tokens, temperature=1.0, top_k=None, top_p=None, min_p=None
+        self, idx, max_new_tokens, temperature=1.0, top_k=None, top_p=None, min_p=None, style_embedding=None
     ):
         """
         Minimal sampler that uses speech_forward() with no targets.
@@ -745,7 +1029,7 @@ class MultiTaskImageSpeech(nn.Module):
         self._set_lora(True)
         for _ in range(max_new_tokens):
             context = idx if idx.size(1) < self.config.block_size else idx[:, -self.config.block_size:]
-            out = self.speech_forward(context)
+            out = self.speech_forward(context, style_embeddings=style_embedding)
             logits = out["logits"][:, -1, :] / max(temperature, 1e-6)
 
             if top_p is not None and top_p > 0.0:
@@ -774,7 +1058,7 @@ class MultiTaskImageSpeech(nn.Module):
             probs = F.softmax(logits, dim=-1)
             idx_next = torch.multinomial(probs, num_samples=1)
 
-            # Stop if EOS token is generated
+            # optional EOS handling if you reserve 1001 as EOS like your speech model
             if idx_next.item() == self.vocab_speech_size - 1:
                 break
 
