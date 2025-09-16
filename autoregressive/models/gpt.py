@@ -530,8 +530,10 @@ class TransformerSpeech(nn.Module):
             probs = F.softmax(logits, dim=-1)
             idx_next = torch.multinomial(probs, num_samples=1)
 
-            if idx_next == 1001:
+            # optional EOS handling if you reserve 1001 as EOS like your speech model
+            if idx_next.item() == self.config.vocab_speech_size - 1:
                 break
+
             idx = torch.cat([idx, idx_next], dim=-1)
 
         return idx

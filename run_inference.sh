@@ -4,7 +4,7 @@
 #  --debug
 
 CUDA_VISIBLE_DEVICES=1 python -W ignore generate_speech_cosy.py \
-  --config result/TTS_result/SpeechOnly_Hubert/6Layer_LibrisTTS_Cosy/configs_training.yaml \
+  --config result/TTS_result/SpeechOnly_Hubert/4Layer_LibrisTTS_Cosy/configs_training.yaml \
   --dataset "test" --folder2save "prediction_tts" \
 
 #CUDA_VISIBLE_DEVICES=1 python -W ignore generate_speech_image.py \
