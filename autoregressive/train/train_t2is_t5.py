@@ -15,7 +15,7 @@ import sys
 sys.path.append("/home/ldap-users/s2220411/Code/new_explore_multimodel/LlamaGen")
 # from autoregressive.models.gpt import GPT_XXL_speech, GPT_Small_speech, GPT_XL, MultiTaskImageSpeech
 # from autoregressive.models.gpt_cosy import GPT_XXL_speech, GPT_Small_speech, GPT_XL, MultiTaskImageSpeech
-from autoregressive.models.gpt_cosy_prompt import GPT_XXL_speech, GPT_Small_speech, GPT_XL, MultiTaskImageSpeech
+from autoregressive.models.gpt_cosy_prompt_attention import GPT_XXL_speech, GPT_Small_speech, GPT_XL, MultiTaskImageSpeech
 from transformers import CLIPProcessor, CLIPModel
 from sentence_transformers import SentenceTransformer, util
 
@@ -175,6 +175,7 @@ def main():
     print(f"{RED}Loaded image generation model from: {img_model_path} {RESET}")
 
     model = MultiTaskImageSpeech(
+        configs=config,
         pretrained_image_model=img_model,
         text_vocab_size=config['speech_config']['text_vocab_size'],
         speech_vocab_size=config['speech_config']['vocab_speech_size'],

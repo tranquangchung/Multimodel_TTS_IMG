@@ -13,8 +13,14 @@ from torch.utils.data.distributed import DistributedSampler
 from transformers import AutoTokenizer
 import sys
 sys.path.append("/home/ldap-users/s2220411/Code/new_explore_multimodel/LlamaGen")
-# from autoregressive.models.gpt import GPT_XXL_speech, GPT_Small_speech, TransformerSpeech
-from autoregressive.models.gpt_cosy import TransformerSpeech, ModelArgs
+# from autoregressive.models.gpt import GPT_XXL_speech, GPT_Small_speech, GPT_XL, MultiTaskImageSpeech
+# from autoregressive.models.gpt_cosy import GPT_XXL_speech, GPT_Small_speech, GPT_XL, MultiTaskImageSpeech
+# from autoregressive.models.gpt_cosy_prompt_attention import GPT_XXL_speech, GPT_Small_speech, GPT_XL, MultiTaskImageSpeech
+from autoregressive.models.gpt_cosy_prompt_attention_flant5 import GPT_XXL_speech, GPT_Small_speech, GPT_XL, MultiTaskImageSpeech
+# from autoregressive.models.gpt_cosy_prompt_attention_flant5_V2 import GPT_XXL_speech, GPT_Small_speech, GPT_XL, MultiTaskImageSpeech
+from transformers import CLIPProcessor, CLIPModel
+from sentence_transformers import SentenceTransformer, util
+
 
 from transformers.optimization import get_linear_schedule_with_warmup
 from collections import deque
@@ -25,9 +31,11 @@ from utils_text import load_config
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter  # Added for TensorBoard integration
 import numpy as np
-from dataset.t2s import DatasetT2S as Dataset
+# from dataset.t2s import DatasetT2S as Dataset
+from dataset.t2s import DatasetT2S_Prompt as Dataset
 import shutil
-from language.t5 import T5Embedder
+from transformers import T5EncoderModel, AutoTokenizer
+
 
 seed = 42
 torch.manual_seed(seed)
@@ -149,28 +157,63 @@ def main():
         with open(os.path.join(path2save, "configs_training.yaml"), 'w') as f:
             yaml.dump(config, f)
 
+    # Initialize tokenizer and model
+    # model_name = config['model']['name']
+    # tokenizer_name = config['tokenizer']['name']
     ###############################
     tokenizer_path = "/home/ldap-users/s2220411/Code/new_explore_multimodel/LlamaGen/pretrained_models/t5-ckpt-v2/flan-t5-xl"
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
 
-    config_model = ModelArgs()
-    model = TransformerSpeech(
-        config=config,
-        config_model=config_model,
+    ### load image generation model
+    latent_size = config['model_config']['image_size'] // config['model_config']['downsample_size']
+    img_model = GPT_XL(
+        block_size=latent_size ** 2,
+        vocab_size=config['image_config']['vocab_size'],
+        cls_token_num=config['image_config']['cls_token_num'],
+        model_type=config['image_config']['gpt_type'],
+    ).to(device)
+    # Load the model weights
+    img_model_path = "/home/ldap-users/s2220411/Code/new_explore_multimodel/LlamaGen/t2i_XL_stage2_512.pt"
+    checkpoint = torch.load(img_model_path, map_location="cpu")
+    img_model.load_state_dict(checkpoint['model'], strict=True)
+    print(f"{RED}Loaded image generation model from: {img_model_path} {RESET}")
+
+    model = MultiTaskImageSpeech(
+        configs=config,
+        pretrained_image_model=img_model,
         text_vocab_size=config['speech_config']['text_vocab_size'],
         speech_vocab_size=config['speech_config']['vocab_speech_size'],
         n_speech_extra_layers=config['speech_config']['n_speech_extra_layers'],
-    ).to(device)
+        image_backbone_tuning_mode=config['model_config']['image_backbone_tuning_mode'],
+        lora_alpha=config['model_config']['lora_alpha'],
+        lora_rank=config['model_config']['lora_rank'],
+    )
+    model.to(device)
+
+    #### Load pretrained model to fine-tune EARS
+    pretrained_checkpoint = "/home/ldap-users/quangchung-t/Code/new_explore_multimodel/LlamaGen/result/TTS_result/ImageSpeechGeneration_Final_Cosyvoce/LibriTTS_1e4_8Layer_16alpha_16rank_BS14_RemoveDup_KeepPunctuation/model_avg.pth"
+    checkpoint = torch.load(pretrained_checkpoint, map_location="cpu")
+    if 'module.' in list(checkpoint['model'].keys())[0]:
+        new_state_dict = {}
+        for k, v in checkpoint['model'].items():
+            new_state_dict[k.replace('module.', '')] = v
+        checkpoint['model'] = new_state_dict
+    model.load_state_dict(checkpoint['model'], strict=False)
+    print(f"{GREEN}Model loaded from {pretrained_checkpoint}{RESET}")
+    #### Load pretrained model to fine-tune EARS
+
+    # t5_model = SentenceTransformer('sentence-transformers/sentence-t5-base')
+
+    t5_path = "/home/ldap-users/s2220411/Code/new_explore_multimodel/LlamaGen/pretrained_models/t5-ckpt/flan-t5-xl"
+    t5_model_kwargs = {'low_cpu_mem_usage': True, 'torch_dtype': torch.float32}
+    t5_model_kwargs['device_map'] = {'shared': device, 'encoder': device}
+    t5_model = T5EncoderModel.from_pretrained(t5_path, **t5_model_kwargs).eval()
+    print("T5 model loaded from:", t5_path)
 
     logger.info(model)
     # Wrap the model with DDP
     if world_size > 1:
         model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[local_rank], output_device=local_rank)
-
-    if rank == 0:
-        logger.info(f"Model and tokenizer initialized. Device: {device}")
-        pytorch_total_params = sum(p.numel() for p in model.parameters())
-        pytorch_total_params_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
     # Load and preprocess JSON dataset
     train_dataset = Dataset(tokenizer, "train", config, args)
@@ -203,7 +246,27 @@ def main():
 
 
     # Define optimizer and scheduler
-    optimizer = AdamW(model.parameters(), lr=float(config['training']['learning_rate']),
+    trainable_params = []
+    trainable_names = []
+    for name, param in model.named_parameters():
+        number_of_params = param.numel()
+        if param.requires_grad:
+            trainable_params.append(param)
+            trainable_names.append(name)
+            if rank == 0:
+                logger.info(f"{RED}Trainable parameter: {name} - {param.shape} - {number_of_params} params{RESET}")
+        else:
+            if rank == 0:
+                logger.info(f"{GREEN}Non-trainable parameter: {name} - {param.shape} - {number_of_params} params{RESET}")
+
+    if rank == 0:
+        logger.info(f"Model and tokenizer initialized. Device: {device}")
+        pytorch_total_params = sum(p.numel() for p in model.parameters())
+        pytorch_total_params_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        logger.info(f"{RED}{'Total parameters:'.ljust(20)}     {pytorch_total_params}{RESET}")
+        logger.info(f"{RED}{'Trainable parameters:'.ljust(20)} {pytorch_total_params_trainable}{RESET}")
+
+    optimizer = AdamW(trainable_params, lr=float(config['training']['learning_rate']),
                       betas=(float(config['training'].get('adam_beta1', 0.9)),
                              float(config['training'].get('adam_beta2', 0.999))),
                       eps=float(config['training'].get('adam_epsilon', 1e-8)),
@@ -249,18 +312,35 @@ def main():
         model.train()
         progress_bar = tqdm(train_loader, desc="Training", leave=False, disable=(rank != 0))
         for batch in progress_bar:
+            optimizer.zero_grad(set_to_none=True)
             primary_loss_tts = torch.tensor(0.0, device=device)
             primary_loss_asr = torch.tensor(0.0, device=device)
+            prompt_instructions = batch['prompt_instructions']
+            prompt_tokens = tokenizer(
+                            prompt_instructions,
+                            max_length=120,
+                            padding='max_length',
+                            truncation=True,
+                            return_attention_mask=True,
+                            add_special_tokens=True,
+                            return_tensors='pt'
+                        )
+            with torch.no_grad():
+                style_embeddings = t5_model(
+                    input_ids=prompt_tokens['input_ids'].to(device, non_blocking=True),
+                    attention_mask=prompt_tokens['attention_mask'].to(device, non_blocking=True)
+                )['last_hidden_state'].detach()  # [B, T, D], D = 2048
             if training_tts:
+                attention_mask = None
                 input_ids, attention_mask, labels = process_data_forward(batch, device, task="TTS")
-                outputs = model(idx=input_ids, mask=attention_mask, targets=labels)
+                outputs = model.speech_forward(idx=input_ids, mask=attention_mask, targets=labels, style_embeddings=None)
                 primary_loss_tts = outputs.get("loss", torch.tensor(0.0, device=device))
                 if primary_loss_tts.dim() > 0:
                     primary_loss_tts = primary_loss_tts.mean()
 
             if training_asr:
                 input_ids, attention_mask, labels = process_data_forward(batch, device, task="ASR")
-                outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels, task="ASR")
+                outputs = model.speech_forward(input_ids=input_ids, attention_mask=attention_mask, labels=labels, task="ASR")
                 primary_loss_asr = outputs.get("loss", torch.tensor(0.0, device=device))
                 if primary_loss_asr.dim() > 0:
                     primary_loss_asr = primary_loss_asr.mean()
@@ -268,6 +348,7 @@ def main():
             primary_loss = (primary_loss_tts + primary_loss_asr)
 
             primary_loss.backward()
+
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             scheduler.step()
@@ -303,16 +384,34 @@ def main():
                     for batch in tqdm(dev_loader, desc="Validation", leave=False, disable=(rank != 0)):
                         primary_loss_tts = torch.tensor(0.0, device=device)
                         primary_loss_asr = torch.tensor(0.0, device=device)
+                        prompt_instructions = batch['prompt_instructions']
+
+                        prompt_tokens = tokenizer(
+                            prompt_instructions,
+                            max_length=120,
+                            padding='max_length',
+                            truncation=True,
+                            return_attention_mask=True,
+                            add_special_tokens=True,
+                            return_tensors='pt'
+                        )
+                        with torch.no_grad():
+                            style_embeddings = t5_model(
+                                input_ids=prompt_tokens['input_ids'].to(device, non_blocking=True),
+                                attention_mask=prompt_tokens['attention_mask'].to(device, non_blocking=True)
+                            )['last_hidden_state'].detach()  # [B, T, D], D = 2048
+
+
                         if training_tts:
                             input_ids, attention_mask, labels = process_data_forward(batch, device, task="TTS")
-                            outputs = model(idx=input_ids, mask=attention_mask, targets=labels)
+                            outputs = model.speech_forward(idx=input_ids, mask=attention_mask, targets=labels, style_embeddings=None)
                             primary_loss_tts = outputs.get("loss", torch.tensor(0.0, device=device))
                             if primary_loss_tts.dim() > 0:
                                 primary_loss_tts = primary_loss_tts.mean()
 
                         if training_asr:
                             input_ids, attention_mask, labels = process_data_forward(batch, device, task="ASR")
-                            outputs = model(input_ids=input_ids, attention_mask=attention_mask,
+                            outputs = model.speech_forward(input_ids=input_ids, attention_mask=attention_mask,
                                             labels=labels, task="ASR")
                             primary_loss_asr = outputs.get("loss", torch.tensor(0.0, device=device))
                             if primary_loss_asr.dim() > 0:
@@ -340,7 +439,8 @@ def main():
                         avg_primary_loss_dev = avg_primary_loss_asr
                     else:
                         avg_primary_loss_dev = avg_primary_loss_tts + avg_primary_loss_asr
-                    if avg_primary_loss_dev < best_val_loss:
+                    # if avg_primary_loss_dev < best_val_loss:
+                    if True:
                         best_val_loss = avg_primary_loss_dev
                         epochs_no_improve = 0
                         logger.info(f"{GREEN}Best model updated at iteration {global_step}{RESET}")

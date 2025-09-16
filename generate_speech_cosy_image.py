@@ -176,17 +176,20 @@ def remove_special_characters(text):
 #     "A little hedgehog shuffled through the grass at dusk. Its tiny feet pressed soft trails in the earth. The air smelled of leaves and soil, cool against its nose. It paused when a breeze rustled, curling slightly before moving on. In the gentle half-light, the hedgehog searched for supper, steady and calm.",
 # ]
 
+# text_sources = [
+#     "A small rabbit hopped through the meadow after the rain, its damp fur shining. Under a leaf, it sat still, listening with wonder.",
+#     "An owl perched high on a branch as stars glowed above. Its bright eyes watched the dark path, wings ready to fly.",
+#     "A turtle moved slowly along the shore, waves touching its shell. It carried peace within, unhurried toward the sea.",
+#     "A gentle deer stood at the forest’s edge, golden fields stretching wide. Thin but strong, it breathed in the fading light.",
+#     "A young bear sat by a stream, paws dipping into cool water. With bright eyes, it played as the forest hummed around it.",
+#     "A cat stretched on the windowsill as rain tapped softly on the glass. Yawning, it curled into a ball, warm and safe.",
+#     "A dog raced across the bright field, ears flying back. Stopping to sniff, it dashed forward again, chasing joy.",
+#     "A tiny bird puffed its feathers against the breeze as the morning sky glowed. Tilting its head, it sang a clear note of hope.",
+#     "A squirrel scurried along a branch, clutching an acorn tight. Without fear, it leapt to the next branch with ease.",
+#     "A little hedgehog shuffled through dusk grass, leaving soft trails in the earth. When the breeze rustled, it curled slightly before moving on."
+# ]
 text_sources = [
-    "A small rabbit hopped through the meadow after the rain, its damp fur shining. Under a leaf, it sat still, listening with wonder.",
-    "An owl perched high on a branch as stars glowed above. Its bright eyes watched the dark path, wings ready to fly.",
-    "A turtle moved slowly along the shore, waves touching its shell. It carried peace within, unhurried toward the sea.",
-    "A gentle deer stood at the forest’s edge, golden fields stretching wide. Thin but strong, it breathed in the fading light.",
-    "A young bear sat by a stream, paws dipping into cool water. With bright eyes, it played as the forest hummed around it.",
-    "A cat stretched on the windowsill as rain tapped softly on the glass. Yawning, it curled into a ball, warm and safe.",
-    "A dog raced across the bright field, ears flying back. Stopping to sniff, it dashed forward again, chasing joy.",
-    "A tiny bird puffed its feathers against the breeze as the morning sky glowed. Tilting its head, it sang a clear note of hope.",
-    "A squirrel scurried along a branch, clutching an acorn tight. Without fear, it leapt to the next branch with ease.",
-    "A little hedgehog shuffled through dusk grass, leaving soft trails in the earth. When the breeze rustled, it curled slightly before moving on."
+    "雨后，一只小兔子在草地上蹦蹦跳跳，湿漉漉的皮毛闪闪发光。它静静地坐在一片树叶下，好奇地聆听着。"
 ]
 
 def generate_speech(
@@ -335,7 +338,7 @@ def generate_image(model, tokenizer, vq_model, t5_model, text_source, device, co
 
 
 def perform_inference(model, tokenizer, vq_model, t5_model, device, frontend, cosyvoice_model, configs, lang=None):
-    path2save_root = os.path.join(configs['training']['output_dir'], "samples")
+    path2save_root = os.path.join(configs['training']['output_dir'], "samples_chinese")
     if not os.path.exists(path2save_root):
         os.makedirs(path2save_root)
     # Load ground truth

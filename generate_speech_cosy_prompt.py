@@ -14,6 +14,7 @@ from tqdm.auto import tqdm
 import numpy as np
 from scipy.io import wavfile  # Used to read audio files
 import librosa
+import shutil
 
 ### this is the code from the Grad-TTS
 import sys
@@ -21,6 +22,7 @@ import sys
 # from autoregressive.models.gpt import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
 # from autoregressive.models.gpt_cosy import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
 from autoregressive.models.gpt_cosy_prompt import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
+# from autoregressive.models.gpt_cosy_prompt_attention import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
 sys.path.append('/home/ldap-users/s2220411/Code/new_explore_tts/CosyVoice')
 sys.path.append('/home/ldap-users/s2220411/Code/new_explore_tts/CosyVoice/third_party/Matcha-TTS')
 from cosyvoice.cli.frontend import CosyVoiceFrontEnd
@@ -288,6 +290,9 @@ def generate_speech(
 
 def perform_inference(model, tokenizer, test_data, frontend, cosyvoice_model, clip_processor, clip_model, configs, lang=None):
     path2save_root = os.path.join(configs['training']['output_dir'], args.folder2save)
+    if os.path.exists(path2save_root):
+        print(f"{RED}Folder {path2save_root} exists, removing it...{RESET}")
+        shutil.rmtree(path2save_root)
     if not os.path.exists(path2save_root):
         os.makedirs(path2save_root)
     # Load ground truth
@@ -295,7 +300,7 @@ def perform_inference(model, tokenizer, test_data, frontend, cosyvoice_model, cl
     transcript_ars = []
 
     reading_styles = [
-        "fast", "slow", "whisper", "highpitch", "lowpitch"
+        "fast", "slow", "whisper", "loud", "highpitch", "lowpitch"
     ]
 
     for index, item in enumerate(text_sources):
@@ -362,6 +367,7 @@ def inference(config):
     img_model.load_state_dict(checkpoint['model'], strict=True)
 
     model = MultiTaskImageSpeech(
+        configs=config,
         pretrained_image_model=img_model,
         text_vocab_size=config['speech_config']['text_vocab_size'],
         speech_vocab_size=config['speech_config']['vocab_speech_size'],

@@ -14,12 +14,16 @@ from tqdm.auto import tqdm
 import numpy as np
 from scipy.io import wavfile  # Used to read audio files
 import librosa
+import shutil
 
 ### this is the code from the Grad-TTS
 import sys
 
 # from autoregressive.models.gpt import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
-from autoregressive.models.gpt_cosy import TransformerSpeech, MultiTaskImageSpeech, ModelArgs, GPT_XL
+# from autoregressive.models.gpt_cosy import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
+# from autoregressive.models.gpt_cosy_prompt import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
+# from autoregressive.models.gpt_cosy_prompt_attention import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
+from autoregressive.models.gpt_cosy_prompt_attention_flant5 import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
 sys.path.append('/home/ldap-users/s2220411/Code/new_explore_tts/CosyVoice')
 sys.path.append('/home/ldap-users/s2220411/Code/new_explore_tts/CosyVoice/third_party/Matcha-TTS')
 from cosyvoice.cli.frontend import CosyVoiceFrontEnd
@@ -38,7 +42,10 @@ import time
 import random
 import glob
 from hyperpyyaml import load_hyperpyyaml
-
+from transformers import CLIPProcessor, CLIPModel
+from sentence_transformers import SentenceTransformer, util
+from dataset.voice_instruction_builder_V2 import instruction_from_filename
+from transformers import T5EncoderModel, AutoTokenizer
 
 seed = 42
 torch.manual_seed(seed)
@@ -173,14 +180,20 @@ text_sources = [
     "A little hedgehog shuffled through dusk grass, leaving soft trails in the earth. When the breeze rustled, it curled slightly before moving on."
 ]
 
+# text_sources = [
+#     "You're just the sweetest person I know and I am so happy to call you my friend. I had the best time with you, I just adore you. I love this gift, thank you!"
+# ]
+
 def generate_speech(
     model,
     tokenizer,
     text_source,
+    prompt_instruction,
     device,
     configs,
     frontend,
     cosyvoice_model,
+    t5_model,
     lang=None,
     path2save_audio=None,
 ):
@@ -206,13 +219,29 @@ def generate_speech(
     encoded_inputs['input_ids']     = torch.cat([encoded_inputs['input_ids'], append_turn], dim=1)
     encoded_inputs['attention_mask'] = torch.cat([encoded_inputs['attention_mask'], append_mask], dim=1)
     encoded_inputs_length = encoded_inputs['input_ids'].shape[1]
+    # extract style embedding from T5 model
 
+    prompt_tokens = tokenizer(
+        prompt_instruction,
+        max_length=120,
+        padding='max_length',
+        truncation=True,
+        return_attention_mask=True,
+        add_special_tokens=True,
+        return_tensors='pt'
+    )
+    with torch.no_grad():
+        style_embedding = t5_model(
+            input_ids=prompt_tokens['input_ids'].to(device, non_blocking=True),
+            attention_mask=prompt_tokens['attention_mask'].to(device, non_blocking=True)
+        )['last_hidden_state'].detach()  # [B, T, D], D = 2048
     # --- sinh unit bằng AR head
     max_new_tokens = configs.get('inference', {}).get('max_length_unit', 512)
     with torch.no_grad():
         outs = model.speech_generate(
             encoded_inputs['input_ids'],
             max_new_tokens=max_new_tokens,
+            style_embedding=None
         )
     outs = outs.tolist()[0][encoded_inputs_length:]  # cắt phần prompt
 
@@ -224,7 +253,8 @@ def generate_speech(
         return
 
     # --- chuẩn bị prompt cho CosyVoice2
-    prompt_wav_path = '/home/ldap-users/Share/Data/librispeech/test-clean/1089/134686/1089-134686-0035.flac'
+    # prompt_wav_path = '/home/ldap-users/Share/Data/librispeech/test-clean/1089/134686/1089-134686-0035.flac'
+    prompt_wav_path = "/home/ldap-users/quangchung-t/data_private/Jenny/jenny/8822.wav"
 
     prompt_wav_16k = load_wav(prompt_wav_path, 16000)  # [T] hoặc numpy
     if not torch.is_tensor(prompt_wav_16k):
@@ -271,40 +301,56 @@ def generate_speech(
         print(f"{GREEN}Saved: {path2save_audio}{RESET}")
 
 
-def perform_inference(model, tokenizer, test_data, frontend, cosyvoice_model, configs, lang=None):
+def perform_inference(model, tokenizer, test_data, frontend, cosyvoice_model, t5_model, configs, lang=None):
     path2save_root = os.path.join(configs['training']['output_dir'], args.folder2save)
+    if os.path.exists(path2save_root):
+        print(f"{RED}Folder {path2save_root} exists, removing it...{RESET}")
+        shutil.rmtree(path2save_root)
     if not os.path.exists(path2save_root):
         os.makedirs(path2save_root)
     # Load ground truth
     groundtruth = []
     transcript_ars = []
-    for index, item in enumerate(test_data):
-        text_source = item['transcript'].strip()
-        # text_source = text_sources[index % len(text_sources)]
-        path2save_audio = os.path.join(path2save_root, f"audio_{index}.wav")
-        generate_speech(
-            model=model,
-            tokenizer=tokenizer,
-            text_source=text_source,
-            device=device,
-            configs=configs,
-            frontend=frontend,
-            cosyvoice_model=cosyvoice_model,
-            lang=lang,
-            path2save_audio=path2save_audio
-        )
-        #### transcription using ASR model
-        transcript = transcription_whisper(path2save_audio, language=lang)
-        print(f"{'text source'.ljust(20)}: {text_source}")
-        print(f"{'transcript (ASR)'.ljust(20)}: {transcript}")
-        groundtruth.append(remove_special_characters(text_source))
-        transcript_ars.append(remove_special_characters(transcript))
-        if args.debug and index >= 2:
-            break
-        if index % 100 == 0:
-            print(f"Processed {index} samples")
-        if index > 1000:
-            break
+    # reading_styles = [
+    #     "fast", "slow", "whisper", "loud", "highpitch", "lowpitch"
+    # ]
+    reading_styles = [
+        # "Jenny's speech is very clear, and she speaks in a very monotone voice, really slowly and with minimal variation in speed."
+        "Jenny speaks in a very close-sounding voice with a slight amount of noise. "
+    ]
+    for index, text_source in enumerate(text_sources):
+        for reading_style in reading_styles:
+            prompt_instruction = reading_style
+            print(f"{MAGENTA}Style: {prompt_instruction}{RESET}")
+            # text_source = item['transcript'].strip()
+            # text_source = text_sources[index % len(text_sources)]
+            text_source = f"<instruct>{prompt_instruction}</instruct>. {text_source}"
+            path2save_audio = os.path.join(path2save_root, f"audio_{index}_noise.wav")
+            generate_speech(
+                model=model,
+                tokenizer=tokenizer,
+                text_source=text_source,
+                prompt_instruction=prompt_instruction,
+                device=device,
+                configs=configs,
+                frontend=frontend,
+                t5_model=t5_model,
+                cosyvoice_model=cosyvoice_model,
+                lang=lang,
+                path2save_audio=path2save_audio
+            )
+            #### transcription using ASR model
+            transcript = transcription_whisper(path2save_audio, language=lang)
+            print(f"{'text source'.ljust(20)}: {text_source}")
+            print(f"{'transcript (ASR)'.ljust(20)}: {transcript}")
+            groundtruth.append(remove_special_characters(text_source))
+            transcript_ars.append(remove_special_characters(transcript))
+            if args.debug and index >= 2:
+                break
+            if index % 100 == 0:
+                print(f"Processed {index} samples")
+            if index > 1000:
+                break
     ############################
     print(f"{GREEN}Done. Check out {path2save_root}{RESET}")
     # evaluate
@@ -322,38 +368,28 @@ def inference(config):
     # 4. Initialize tokenizer and model
     tokenizer_path = "/home/ldap-users/s2220411/Code/new_explore_multimodel/LlamaGen/pretrained_models/t5-ckpt/flan-t5-xl"
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+    latent_size = config['model_config']['image_size'] // config['model_config']['downsample_size']
 
-    #############################################
-    # latent_size = config['model_config']['image_size'] // config['model_config']['downsample_size']
-    # img_model = GPT_XL(
-    #     block_size=latent_size ** 2,
-    #     vocab_size=config['image_config']['vocab_size'],
-    #     cls_token_num=config['image_config']['cls_token_num'],
-    #     model_type=config['image_config']['gpt_type'],
-    # ).to(device)
-    # # Load the model weights
-    # img_model_path = "/home/ldap-users/s2220411/Code/new_explore_multimodel/LlamaGen/t2i_XL_stage2_512.pt"
-    # checkpoint = torch.load(img_model_path, map_location="cpu")
-    # img_model.load_state_dict(checkpoint['model'], strict=True)
-    # model = MultiTaskImageSpeech(
-    #     pretrained_image_model=img_model,
-    #     text_vocab_size=config['speech_config']['text_vocab_size'],
-    #     speech_vocab_size=config['speech_config']['vocab_speech_size'],
-    #     n_speech_extra_layers=config['speech_config']['n_speech_extra_layers'],
-    #     image_backbone_tuning_mode=config['model_config']['image_backbone_tuning_mode'],
-    #     lora_alpha=config['model_config']['lora_alpha'],
-    #     lora_rank=config['model_config']['lora_rank'],
-    # )
-    #############################################
-    config_model = ModelArgs()
-    model = TransformerSpeech(
-        config=config,
-        config_model=config_model,
+    img_model = GPT_XL(
+        block_size=latent_size ** 2,
+        vocab_size=config['image_config']['vocab_size'],
+        cls_token_num=config['image_config']['cls_token_num'],
+        model_type=config['image_config']['gpt_type'],
+    ).to(device)
+    # Load the model weights
+    img_model_path = "/home/ldap-users/s2220411/Code/new_explore_multimodel/LlamaGen/t2i_XL_stage2_512.pt"
+    checkpoint = torch.load(img_model_path, map_location="cpu")
+    img_model.load_state_dict(checkpoint['model'], strict=True)
+    model = MultiTaskImageSpeech(
+        configs=config,
+        pretrained_image_model=img_model,
         text_vocab_size=config['speech_config']['text_vocab_size'],
         speech_vocab_size=config['speech_config']['vocab_speech_size'],
         n_speech_extra_layers=config['speech_config']['n_speech_extra_layers'],
-    ).to(device)
-    #############################################
+        image_backbone_tuning_mode=config['model_config']['image_backbone_tuning_mode'],
+        lora_alpha=config['model_config']['lora_alpha'],
+        lora_rank=config['model_config']['lora_rank'],
+    )
 
     print(model)
     model.eval()
@@ -404,7 +440,14 @@ def inference(config):
                          '{}/hift.pt'.format(model_dir))
     print("load frontend done")
 
-    perform_inference(model, tokenizer, test_data, frontend, cosyvoice_model, configs=config, lang=lang)
+
+    t5_path = "/home/ldap-users/s2220411/Code/new_explore_multimodel/LlamaGen/pretrained_models/t5-ckpt/flan-t5-xl"
+    t5_model_kwargs = {'low_cpu_mem_usage': True, 'torch_dtype': torch.float32}
+    t5_model_kwargs['device_map'] = {'shared': device, 'encoder': device}
+    t5_model = T5EncoderModel.from_pretrained(t5_path, **t5_model_kwargs).eval()
+    print("T5 model loaded from:", t5_path)
+
+    perform_inference(model, tokenizer, test_data, frontend, cosyvoice_model, t5_model, configs=config, lang=lang)
 
 
 if __name__ == "__main__":

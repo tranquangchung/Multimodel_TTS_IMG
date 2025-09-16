@@ -20,16 +20,15 @@ task_training:
 loss_target: TTS # TTS, ASR, or TTS_ASR
 dataset:
   path_dir:
-    #- "/home/ldap-users/s2220411/Code/new_explore_tts/MachineSpeechChain_ASRU25/dataset/Cosyvoice2Token/LibriTTS"
-    - "/home/ldap-users/s2220411/Code/new_explore_tts/MachineSpeechChain_ASRU25/dataset/Cosyvoice2Token/EARS_en_US"
+    - "/home/ldap-users/s2220411/Code/new_explore_tts/MachineSpeechChain_ASRU25/dataset/Cosyvoice2Token/LibriTTS"
+    #- "/home/ldap-users/s2220411/Code/new_explore_tts/MachineSpeechChain_ASRU25/dataset/Cosyvoice2Token/EARS_en_US"
+    #- "/home/ldap-users/s2220411/Code/new_explore_tts/MachineSpeechChain_ASRU25/dataset/Cosyvoice2Token/JENNY6H"
   langs:
     - "English"
   train_files:
     - "train.json"
-    - "train.json"
-    - "train.json"
     #- "train-clean-100.json"
-    - "train-clean-360.json"
+    #- "train-clean-360.json"
     #- "train-other-500.json"
   dev_files:
     - "dev.json"
@@ -43,10 +42,10 @@ preprocessing:
   remove_consecutive_duplicates: true
 
 training:
-  num_workers: 6 # Number of workers for DataLoader
+  num_workers: 4 # Number of workers for DataLoader
   evaluation_strategy: "epoch"
-  learning_rate: 1e-6
-  output_dir: !ref "result/TTS_result/ImageSpeechGeneration_Final_Cosyvoce_Prompt/test/EARSx3_Libris360_1e6_8Layer_16alpha_16rank_BS14"
+  learning_rate: 1e-4
+  output_dir: !ref "result/TTS_result/ImageSpeechGeneration_Final_Cosyvoce_BaselineV2/SpeechModel_2Layer"
   per_device_train_batch_size: 14 #32 #10 #8 #16 #32 # 32
   per_device_eval_batch_size: 14 #32 #10 #8 #16 #32 # 32
   num_train_epochs: 1000
@@ -66,7 +65,7 @@ training:
   #adam_beta2: 0.98
   #adam_epsilon: 1e-6
   early_stopping: false
-  save_iterations: 500 # 200 #5000 #10000 #1000
+  save_iterations: 2500 #1000 # 200 #5000 #10000 #1000
   keep_last_n_checkpoints: 5
   early_stopping_patience: 5
 
@@ -91,9 +90,12 @@ speech_config:
   text_vocab_size: 32100
   vocab_speech_size: 6563
   hidden_size: 512
-  n_speech_extra_layers: 8
+  n_speech_extra_layers: 2
   freeze_image_backbone: True
-
+prompt_config:
+  #style_proj_dim: 512 # clip
+  #style_proj_dim: 768 # t5
+  style_proj_dim: 2048 # flan-t5
 
 tts_decoder_mbart:
   use_tts_decoder: false

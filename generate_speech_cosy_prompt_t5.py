@@ -14,13 +14,15 @@ from tqdm.auto import tqdm
 import numpy as np
 from scipy.io import wavfile  # Used to read audio files
 import librosa
+import shutil
 
 ### this is the code from the Grad-TTS
 import sys
 
 # from autoregressive.models.gpt import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
 # from autoregressive.models.gpt_cosy import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
-from autoregressive.models.gpt_cosy_prompt import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
+# from autoregressive.models.gpt_cosy_prompt import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
+from autoregressive.models.gpt_cosy_prompt_attention import GPT_XXL_speech, MultiTaskImageSpeech, GPT_XL
 sys.path.append('/home/ldap-users/s2220411/Code/new_explore_tts/CosyVoice')
 sys.path.append('/home/ldap-users/s2220411/Code/new_explore_tts/CosyVoice/third_party/Matcha-TTS')
 from cosyvoice.cli.frontend import CosyVoiceFrontEnd
@@ -163,22 +165,22 @@ def remove_special_characters(text):
     text = re.sub(_whitespace_re, ' ', text)
     return text.lower().strip()
 
-# text_sources = [
-#     "A small rabbit hopped through the meadow after the rain, its damp fur shining. Under a leaf, it sat still, listening with wonder.",
-#     "An owl perched high on a branch as stars glowed above. Its bright eyes watched the dark path, wings ready to fly.",
-#     "A turtle moved slowly along the shore, waves touching its shell. It carried peace within, unhurried toward the sea.",
-#     "A gentle deer stood at the forest’s edge, golden fields stretching wide. Thin but strong, it breathed in the fading light.",
-#     "A young bear sat by a stream, paws dipping into cool water. With bright eyes, it played as the forest hummed around it.",
-#     "A cat stretched on the windowsill as rain tapped softly on the glass. Yawning, it curled into a ball, warm and safe.",
-#     "A dog raced across the bright field, ears flying back. Stopping to sniff, it dashed forward again, chasing joy.",
-#     "A tiny bird puffed its feathers against the breeze as the morning sky glowed. Tilting its head, it sang a clear note of hope.",
-#     "A squirrel scurried along a branch, clutching an acorn tight. Without fear, it leapt to the next branch with ease.",
-#     "A little hedgehog shuffled through dusk grass, leaving soft trails in the earth. When the breeze rustled, it curled slightly before moving on."
-# ]
-
 text_sources = [
-    "You're just the sweetest person I know and I am so happy to call you my friend. I had the best time with you, I just adore you. I love this gift, thank you!"
+    "A small rabbit hopped through the meadow after the rain, its damp fur shining. Under a leaf, it sat still, listening with wonder.",
+    "An owl perched high on a branch as stars glowed above. Its bright eyes watched the dark path, wings ready to fly.",
+    "A turtle moved slowly along the shore, waves touching its shell. It carried peace within, unhurried toward the sea.",
+    "A gentle deer stood at the forest’s edge, golden fields stretching wide. Thin but strong, it breathed in the fading light.",
+    "A young bear sat by a stream, paws dipping into cool water. With bright eyes, it played as the forest hummed around it.",
+    "A cat stretched on the windowsill as rain tapped softly on the glass. Yawning, it curled into a ball, warm and safe.",
+    "A dog raced across the bright field, ears flying back. Stopping to sniff, it dashed forward again, chasing joy.",
+    "A tiny bird puffed its feathers against the breeze as the morning sky glowed. Tilting its head, it sang a clear note of hope.",
+    "A squirrel scurried along a branch, clutching an acorn tight. Without fear, it leapt to the next branch with ease.",
+    "A little hedgehog shuffled through dusk grass, leaving soft trails in the earth. When the breeze rustled, it curled slightly before moving on."
 ]
+
+# text_sources = [
+#     "You're just the sweetest person I know and I am so happy to call you my friend. I had the best time with you, I just adore you. I love this gift, thank you!"
+# ]
 
 def generate_speech(
     model,
@@ -286,13 +288,16 @@ def generate_speech(
 
 def perform_inference(model, tokenizer, test_data, frontend, cosyvoice_model, t5_model, configs, lang=None):
     path2save_root = os.path.join(configs['training']['output_dir'], args.folder2save)
+    if os.path.exists(path2save_root):
+        print(f"{RED}Folder {path2save_root} exists, removing it...{RESET}")
+        shutil.rmtree(path2save_root)
     if not os.path.exists(path2save_root):
         os.makedirs(path2save_root)
     # Load ground truth
     groundtruth = []
     transcript_ars = []
     reading_styles = [
-        "fast", "slow", "whisper", "highpitch", "lowpitch"
+        "fast", "slow", "whisper", "loud", "highpitch", "lowpitch"
     ]
     for index, item in enumerate(test_data):
         for reading_style in reading_styles:
@@ -326,7 +331,6 @@ def perform_inference(model, tokenizer, test_data, frontend, cosyvoice_model, t5
                 print(f"Processed {index} samples")
             if index > 1000:
                 break
-        break
     ############################
     print(f"{GREEN}Done. Check out {path2save_root}{RESET}")
     # evaluate
@@ -356,8 +360,8 @@ def inference(config):
     img_model_path = "/home/ldap-users/s2220411/Code/new_explore_multimodel/LlamaGen/t2i_XL_stage2_512.pt"
     checkpoint = torch.load(img_model_path, map_location="cpu")
     img_model.load_state_dict(checkpoint['model'], strict=True)
-
     model = MultiTaskImageSpeech(
+        configs=config,
         pretrained_image_model=img_model,
         text_vocab_size=config['speech_config']['text_vocab_size'],
         speech_vocab_size=config['speech_config']['vocab_speech_size'],
