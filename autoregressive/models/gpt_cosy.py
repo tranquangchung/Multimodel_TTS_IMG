@@ -673,8 +673,11 @@ class MultiTaskImageSpeech(nn.Module):
         self.text_embeddings = nn.Embedding(self.vocab_text_size, self.config.dim)
 
         dpr = [x.item() for x in torch.linspace(0, self.config.drop_path_rate, n_speech_extra_layers)]
+        # self.speech_layers = nn.ModuleList(
+        #     [TransformerSpeechBlock(self.config, dpr[i]) for i in range(n_speech_extra_layers)]
+        # )
         self.speech_layers = nn.ModuleList(
-            [TransformerSpeechBlock(self.config, dpr[i]) for i in range(n_speech_extra_layers)]
+            [TransformerBlock(self.config, dpr[i]) for i in range(n_speech_extra_layers)]
         )
 
         self.speech_norm = RMSNorm(self.config.dim, eps=self.config.norm_eps)
@@ -806,7 +809,6 @@ class MultiTaskImageSpeech(nn.Module):
             idx=idx, cond_idx=cond_idx, input_pos=input_pos,
             targets=targets, mask=mask, valid=valid
         )
-
 
     def image_generate(
         self,

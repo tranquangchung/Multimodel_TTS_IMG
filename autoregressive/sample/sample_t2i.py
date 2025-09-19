@@ -139,9 +139,20 @@ def main(args):
     #     "Freddy the frog found a magical paintbrush. He painted glowing shapes in the sky—stars, ribbons, sparkles. Forest animals watched in awe. “Every day needs a little magic,” Freddy said, hopping away.",
     #     "Ziggy the zebra woke to find his stripes turned rainbow. Other zebras cheered, and a chameleon said, “Nice new look!” Ziggy danced under the sun and painted his colorful self on rocks."
     # ]
+    image_prefix_promt = "Cartoon Colorful Style, high quality, detailed, trending on artstation, 4k"
     prompts = [
-        "in the middle of a mountain meadow, a bear sits quietly, planting tiny seeds in a circle around him.",
+        f"{image_prefix_promt} A small rabbit hopped through the meadow after the rain. Its ears twitched at every sound, and its fur was still damp. It found a quiet spot under a leaf and watched drops fall to the ground. The world felt large and calm, and the rabbit simply listened, heart beating soft with wonder.",
+        f"{image_prefix_promt} An owl perched on a tall branch in the silent night. The stars glowed above, and the wind whispered through the trees. The owl’s eyes shone bright, watching the dark path below. It spread its wings slowly, ready to fly. For the owl, the night was not lonely, but full of secrets.",
+        f"{image_prefix_promt} A turtle moved slowly along the shore, each step steady and sure. Waves rolled in and touched its shell before sliding back. The air smelled of salt, and the sand was warm underfoot. The turtle did not hurry. It carried a quiet world within, finding peace in every small movement toward the sea.",
+        f"{image_prefix_promt} A gentle deer stood at the edge of the forest, nose lifted to the breeze. The field stretched wide, golden in the fading light. Its legs were thin but strong, ready to leap if needed. Yet in that moment, the deer simply stood still, breathing in the quiet beauty of the open air.",
+        f"{image_prefix_promt} A young bear sat by a stream, paws dipping into the cool water. Small fish flashed like silver under the surface. The bear leaned close, eyes bright with hunger and play. The forest hummed softly around it, full of life. For the bear, the world was both a playground and a home.",
+        f"{image_prefix_promt} A cat stretched on the windowsill, tail curling like a ribbon. Outside, the rain tapped softly on the glass. The cat’s eyes followed every drop, slow and calm. It gave a long yawn, then curled into a ball, listening to the gentle rhythm. In that small space, the cat felt warm and safe.",
+        f"{image_prefix_promt} A dog ran across the field with ears flying back and tongue hanging out. The grass bent under its paws, and the sky was wide and bright. It stopped to sniff the ground, then dashed forward again, chasing nothing but joy. For the dog, every open space was a new adventure.",
+        f"{image_prefix_promt} A tiny bird sat on the edge of a branch, feathers puffed against the breeze. The morning sun painted the sky in soft colors. The bird tilted its head, then sang a clear, sweet note. The sound drifted far, carrying hope with it. Even small wings could fill the sky with song.",
+        f"{image_prefix_promt} A squirrel scurried along a tree branch, tail flicking as it moved. It held an acorn tight, eyes quick and alert. The forest floor looked far below, but the squirrel did not fear. It jumped to the next branch with ease, carrying both food and courage high above the quiet ground.",
+        f"{image_prefix_promt} A little hedgehog shuffled through the grass at dusk. Its tiny feet pressed soft trails in the earth. The air smelled of leaves and soil, cool against its nose. It paused when a breeze rustled, curling slightly before moving on. In the gentle half-light, the hedgehog searched for supper, steady and calm.",
     ]
+
     print(prompts)
 
     caption_embs, emb_masks = t5_model.get_text_embeddings(prompts)# caption_embs: [B, T, D], emb_masks: [B, T]

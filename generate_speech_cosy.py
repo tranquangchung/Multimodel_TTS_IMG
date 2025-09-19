@@ -160,17 +160,23 @@ def remove_special_characters(text):
     text = re.sub(_whitespace_re, ' ', text)
     return text.lower().strip()
 
+# text_sources = [
+#     "A small rabbit hopped through the meadow after the rain, its damp fur shining. Under a leaf, it sat still, listening with wonder.",
+#     "An owl perched high on a branch as stars glowed above. Its bright eyes watched the dark path, wings ready to fly.",
+#     "A turtle moved slowly along the shore, waves touching its shell. It carried peace within, unhurried toward the sea.",
+#     "A gentle deer stood at the forest’s edge, golden fields stretching wide. Thin but strong, it breathed in the fading light.",
+#     "A young bear sat by a stream, paws dipping into cool water. With bright eyes, it played as the forest hummed around it.",
+#     "A cat stretched on the windowsill as rain tapped softly on the glass. Yawning, it curled into a ball, warm and safe.",
+#     "A dog raced across the bright field, ears flying back. Stopping to sniff, it dashed forward again, chasing joy.",
+#     "A tiny bird puffed its feathers against the breeze as the morning sky glowed. Tilting its head, it sang a clear note of hope.",
+#     "A squirrel scurried along a branch, clutching an acorn tight. Without fear, it leapt to the next branch with ease.",
+#     "A little hedgehog shuffled through dusk grass, leaving soft trails in the earth. When the breeze rustled, it curled slightly before moving on."
+# ]
+
 text_sources = [
-    "A small rabbit hopped through the meadow after the rain, its damp fur shining. Under a leaf, it sat still, listening with wonder.",
-    "An owl perched high on a branch as stars glowed above. Its bright eyes watched the dark path, wings ready to fly.",
-    "A turtle moved slowly along the shore, waves touching its shell. It carried peace within, unhurried toward the sea.",
-    "A gentle deer stood at the forest’s edge, golden fields stretching wide. Thin but strong, it breathed in the fading light.",
-    "A young bear sat by a stream, paws dipping into cool water. With bright eyes, it played as the forest hummed around it.",
-    "A cat stretched on the windowsill as rain tapped softly on the glass. Yawning, it curled into a ball, warm and safe.",
-    "A dog raced across the bright field, ears flying back. Stopping to sniff, it dashed forward again, chasing joy.",
-    "A tiny bird puffed its feathers against the breeze as the morning sky glowed. Tilting its head, it sang a clear note of hope.",
-    "A squirrel scurried along a branch, clutching an acorn tight. Without fear, it leapt to the next branch with ease.",
-    "A little hedgehog shuffled through dusk grass, leaving soft trails in the earth. When the breeze rustled, it curled slightly before moving on."
+    # "The little rabbit found a shiny red apple in the grass. He happily shared it with his best friend, the squirrel."
+    # "A hungry fox was walking past a vineyard when he saw some ripe, juicy grapes hanging from a vine. They looked so delicious! The fox jumped high to grab them but couldn’t reach them, no matter how hard he tried. Tired and frustrated, the fox walked away, grumbling, “Those grapes are probably sour anyway!” But deep down, he knew he had just given up too quickly."
+    "A hare and a tortoise were friends. The hare bragged he was the fastest and challenged the tortoise to a race. The hare ran quickly and stopped to nap. The tortoise kept going slowly and steadily. When the hare woke up, the tortoise had already crossed the finish line and won."
 ]
 
 def generate_speech(

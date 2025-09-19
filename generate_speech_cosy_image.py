@@ -158,11 +158,12 @@ def remove_special_characters(text):
 
     text = re.sub(r'\b\d+\b', convert_match, text)
     for char in CHARS_TO_IGNORE:
-        text = text.replace(char.strip(), "")
+        text = text.replace(char.strip(), " ")
 
     text = re.sub(_whitespace_re, ' ', text)
     return text.lower().strip()
 
+image_prefix_promt = "Cartoon Style, No Artifacts, High Quality, No Text, No Noise, No Blur "
 # text_sources = [
 #     "A small rabbit hopped through the meadow after the rain. Its ears twitched at every sound, and its fur was still damp. It found a quiet spot under a leaf and watched drops fall to the ground. The world felt large and calm, and the rabbit simply listened, heart beating soft with wonder.",
 #     "An owl perched on a tall branch in the silent night. The stars glowed above, and the wind whispered through the trees. The owl’s eyes shone bright, watching the dark path below. It spread its wings slowly, ready to fly. For the owl, the night was not lonely, but full of secrets.",
@@ -177,17 +178,258 @@ def remove_special_characters(text):
 # ]
 
 text_sources = [
-    "A small rabbit hopped through the meadow after the rain, its damp fur shining. Under a leaf, it sat still, listening with wonder.",
-    "An owl perched high on a branch as stars glowed above. Its bright eyes watched the dark path, wings ready to fly.",
-    "A turtle moved slowly along the shore, waves touching its shell. It carried peace within, unhurried toward the sea.",
-    "A gentle deer stood at the forest’s edge, golden fields stretching wide. Thin but strong, it breathed in the fading light.",
-    "A young bear sat by a stream, paws dipping into cool water. With bright eyes, it played as the forest hummed around it.",
-    "A cat stretched on the windowsill as rain tapped softly on the glass. Yawning, it curled into a ball, warm and safe.",
-    "A dog raced across the bright field, ears flying back. Stopping to sniff, it dashed forward again, chasing joy.",
-    "A tiny bird puffed its feathers against the breeze as the morning sky glowed. Tilting its head, it sang a clear note of hope.",
-    "A squirrel scurried along a branch, clutching an acorn tight. Without fear, it leapt to the next branch with ease.",
-    "A little hedgehog shuffled through dusk grass, leaving soft trails in the earth. When the breeze rustled, it curled slightly before moving on."
+"A brown dog barked happily in the sunny yard.",
+"A fluffy white cat stretched lazily on the windowsill.",
+"A pink piglet rolled playfully in the muddy puddle.",
+"A black cow chewed grass slowly in the green pasture.",
+"A proud rooster crowed loudly at sunrise.",
+"A hen clucked softly as her chicks followed behind.",
+"A white goose spread its wings beside the pond.",
+"A duck splashed joyfully in the farmyard puddle.",
+"A gray donkey brayed beside the wooden fence.",
+"A brown horse galloped quickly across the open field.",
+"A rabbit nibbled fresh carrots in the garden.",
+"A sheep grazed quietly under the tall oak tree.",
+"A goat jumped nimbly on the rocky hillside.",
+"A turkey strutted proudly around the barnyard.",
+"A pigeon pecked crumbs on the city street.",
+"A guinea pig squeaked inside its little cage.",
+"A hamster spun quickly in its round wheel.",
+"A canary sang a cheerful song in the morning light.",
+"A parakeet chirped brightly inside the living room.",
+"A golden retriever chased a ball across the yard.",
+"A black cat hid quietly under the chair.",
+"A white rabbit hopped happily across the meadow.",
+"A calico kitten played with a red ball of yarn.",
+"A pony trotted playfully around the paddock.",
+"A brown cowbell rang softly as the herd walked home.",
+"A pair of ducks waddled along the village path.",
+"A group of sheep huddled together in the shade.",
+"A black goat munched grass near the stone wall.",
+"A rooster flapped its wings proudly on the fence post.",
+"A mother hen sheltered her chicks under her wings.",
+"A spotted dog wagged its tail at the children.",
+"A fluffy puppy licked the boy’s hand happily.",
+"A ginger cat purred loudly on the soft cushion.",
+"A white dove fluttered above the town square.",
+"A small lamb followed closely behind its mother.",
+"A brown ox pulled a heavy wooden cart.",
+"A duckling paddled quickly behind its mother duck.",
+"A horse neighed loudly in the village stable.",
+"A farm dog ran circles around the flock of sheep.",
+"A rabbit twitched its nose in the fresh grass.",
+"A cat stretched its back in the warm sunlight.",
+"A pig grunted happily while eating apples.",
+"A foal trotted beside its mother horse.",
+"A goose honked loudly as it crossed the path.",
+"A chicken pecked grain from the ground.",
+"A donkey carried baskets along the country road.",
+"A rooster crowed again as the sun climbed higher.",
+"A small terrier barked at the passing bicycle.",
+"A cow drank water from the farm trough.",
+"A white kitten chased a butterfly in the yard.",
+"A golden lion roared across the wide savanna.",
+"A gray elephant sprayed cool water with its trunk.",
+"A red fox darted into the autumn forest leaves.",
+"A tall giraffe reached for tender leaves in the tree.",
+"A panda chewed bamboo quietly in the green valley.",
+"A dolphin leapt high above the blue ocean waves.",
+"A polar bear trudged slowly across the icy plain.",
+"A peacock spread shimmering feathers under the sun.",
+"A green turtle crawled across the sandy beach.",
+"An owl hooted softly in the quiet night forest.",
+"A monkey swung quickly between jungle branches.",
+"A brown bear caught a fish in the rushing river.",
+"A stag stood proudly at the forest edge.",
+"A wolf padded silently through the snowy woods.",
+"A raccoon washed food in the shallow stream.",
+"A hedgehog curled up under the fallen leaves.",
+"A camel rested under the hot desert sun.",
+"A kangaroo hopped swiftly across the red sand.",
+"A parrot squawked loudly in the tropical jungle.",
+"A zebra grazed peacefully on the golden grassland.",
+"A cheetah sprinted across the dry savanna plain.",
+"A tiger prowled quietly in the thick jungle.",
+"A crocodile basked lazily on the muddy bank.",
+"A hippo yawned widely in the cool river.",
+"A seal clapped its flippers near the rocky shore.",
+"A penguin waddled slowly across the snowy ice.",
+"A walrus rested with its tusks on the icy beach.",
+"A whale spouted water high into the air.",
+"A shark swam silently below the deep waves.",
+"A flamingo stood gracefully in the shallow lagoon.",
+"A lynx crept carefully through the snowy undergrowth.",
+"A leopard stretched on a high tree branch.",
+"A jaguar prowled near the forest river.",
+"A gorilla beat its chest under the jungle canopy.",
+"An orangutan reached for fruit in the tall tree.",
+"A chimpanzee clapped loudly at sunset.",
+"A sloth hung lazily from a tree branch.",
+"An anteater searched the ground for ants.",
+"A tapir waded slowly into the water.",
+"A moose stood tall beside the mountain lake.",
+"A reindeer trotted across the snowy field.",
+"A bison grazed heavily on the wide prairie.",
+"A yak climbed steadily along the rocky trail.",
+"A panther crept quietly in the dark forest.",
+"A hummingbird hovered above the red flower.",
+"A toucan perched brightly on the rainforest branch.",
+"A vulture circled slowly above the dry canyon.",
+"A stork stood still in the marsh water.",
+"A falcon dived swiftly toward its prey.",
+"An eagle soared high over the mountain peaks.",
+"A yellow school bus carried children down the morning road.",
+"A red fire truck raced to the burning house.",
+"A blue sailboat floated gently on the summer sea.",
+"A silver airplane glided through the white clouds.",
+"A long green train rolled through the mountain valley.",
+"A tractor pulled heavy hay across the sunny field.",
+"A bicycle rang its bell on the garden path.",
+"A wooden boat rocked gently on the calm lake.",
+"A black car cruised along the highway at night.",
+"A hot air balloon drifted slowly into the sunrise sky.",
+"A rocket blasted high into the night sky of stars.",
+"A submarine slipped quietly under the ocean waves.",
+"A scooter zipped along the busy city street.",
+"A bright balloon floated above the crowded fairground.",
+"A motorbike sped past the row of houses.",
+"A taxi stopped at the busy corner of the square.",
+"A bus picked up children in the pouring rain.",
+"A train whistled loudly as it entered the station.",
+"An airplane landed smoothly on the runway lights.",
+"A delivery van parked outside the bakery shop.",
+"A horse cart rattled along the village road.",
+"A police car flashed blue lights in the dark street.",
+"An ambulance rushed through traffic with sirens loud.",
+"A garbage truck stopped to collect bins on the street.",
+"A tram rolled slowly through the city center.",
+"A jeep bounced across the rocky desert road.",
+"A sports car sped quickly around the sharp corner.",
+"A pickup truck carried hay bales to the farm.",
+"A ferry carried cars across the wide river.",
+"A fishing boat returned full of silver fish.",
+"A cargo ship sailed steadily across the ocean.",
+"A bulldozer pushed earth on the construction site.",
+"A crane lifted heavy steel beams into place.",
+"A fire engine ladder rose high against the building.",
+"A snowplow cleared the road after the storm.",
+"A tank rolled noisily across the training ground.",
+"A race car zoomed around the circular track.",
+"A helicopter hovered above the city skyline.",
+"A glider floated silently in the summer sky.",
+"A skateboard rolled down the hill with speed.",
+"A kayak paddled quietly across the mountain lake.",
+"A canoe drifted along the calm forest river.",
+"A caravan parked by the beach for the night.",
+"A delivery bike carried food through the traffic.",
+"A trolleybus rumbled through the busy avenue.",
+"A bulldozer cleared rubble from the old site.",
+"A cement truck mixed concrete at the road works.",
+"A metro train arrived at the underground station.",
+"A rocket launched astronauts into the blue sky.",
+"A teddy bear sat on the child’s bed waiting for a hug.",
+"A spinning top twirled quickly on the wooden floor.",
+"A paper kite flew high in the windy sky.",
+"A red crayon drew a bright circle on the paper.",
+"A storybook opened with pictures of castles and dragons.",
+"A silver bell rang sweetly at the cottage door.",
+"A lamp glowed warmly in the quiet room.",
+"A piano played soft notes on the stage.",
+"A trumpet shone brightly under the stage lights.",
+"A drum thumped loudly in the parade.",
+"A guitar rested against the old chair.",
+"A violin sang softly in the orchestra.",
+"A green apple lay fresh on the table.",
+"An orange rolled across the kitchen counter.",
+"A yellow banana curved gently in the basket.",
+"A slice of watermelon dripped juice in the sun.",
+"A notebook lay open with neat writing inside.",
+"A pencil scribbled quickly on the page.",
+"A rubber ball bounced across the playground.",
+"A silver spoon clinked in the tea cup.",
+"A pair of scissors snipped through the paper.",
+"A ruler measured the length of the desk.",
+"A school bag hung on the classroom hook.",
+"A lunch box sat beside the bottle of water.",
+"A toy train circled around the small track.",
+"A toy car rolled under the sofa.",
+"A doll wore a red dress with white shoes.",
+"A teddy bear wore a ribbon around its neck.",
+"A puzzle lay unfinished on the floor.",
+"A stack of blocks toppled onto the carpet.",
+"A balloon popped loudly in the air.",
+"A ball of yarn rolled across the floor.",
+"A football flew high into the net.",
+"A basketball bounced on the court floor.",
+"A tennis racket leaned against the wall.",
+"A pair of skates glided over the ice rink.",
+"A toy plane zoomed above the child’s head.",
+"A toy boat floated in the bathtub water.",
+"A bucket held sand beside the castle.",
+"A spade dug into the soft sand.",
+"A candle flickered gently on the table.",
+"A clock ticked loudly on the wall.",
+"A blanket folded neatly on the bed.",
+"A chair stood quietly beside the desk.",
+"A cushion rested on the sofa seat.",
+"A mirror reflected the bright sunlight.",
+"A vase of flowers stood on the window sill.",
+"A broom leaned against the kitchen wall.",
+"A basket of apples sat on the counter.",
+"A rainbow stretched across the blue sky after rain.",
+"The golden sun rose slowly above the quiet hills.",
+"The silver moon shone brightly over the calm river.",
+"A falling star streaked across the midnight sky.",
+"A snowflake landed softly on the child’s mitten.",
+"A warm breeze rustled through the green grass.",
+"Spring rain tapped gently on the fresh leaves.",
+"A golden autumn leaf drifted in the cool wind.",
+"A flash of lightning lit the dark storm clouds.",
+"A snowstorm covered the forest in white silence.",
+"A tall pine tree stood strong on the mountain slope.",
+"A cherry tree bloomed pink in the spring garden.",
+"A sunflower turned its head toward the bright sun.",
+"A lavender field spread purple across the hill.",
+"A bamboo grove swayed gently in the morning air.",
+"An orange pumpkin grew fat under the green leaves.",
+"A willow tree bent its branches over the pond.",
+"A cactus stood tall in the desert heat.",
+"A wheat field waved golden in the summer wind.",
+"A calm blue lake reflected the snowy peaks.",
+"A river sparkled brightly in the sunshine.",
+"A waterfall crashed loudly into the pool below.",
+"The ocean waves rolled gently onto the shore.",
+"A mountain peak glistened with snow in the sun.",
+"A valley lay green between the tall hills.",
+"A meadow bloomed with colorful wildflowers.",
+"A desert stretched far under the blazing sun.",
+"A storm cloud gathered dark in the sky.",
+"A rainbow reappeared after the heavy rain.",
+"A breeze carried the scent of jasmine flowers.",
+"A thunderclap echoed across the valley.",
+"A glacier shone white under the bright sun.",
+"A volcano smoked slowly in the distance.",
+"A canyon opened wide between the cliffs.",
+"A coral reef glowed with fish underwater.",
+"A tide rose high under the full moon.",
+"A breeze shook the tall reeds by the river.",
+"A maple tree turned red in the autumn air.",
+"An oak tree spread its branches wide.",
+"A pine forest whispered in the winter wind.",
+"A lily floated on the still pond water.",
+"A daisy bloomed white in the green meadow.",
+"A rose opened red in the warm sun.",
+"Tulips colored the garden in springtime.",
+"A patch of clover spread across the field.",
+"A snowdrift piled against the wooden fence.",
+"A frost sparkled on the early morning grass.",
+"The horizon glowed pink with sunset light.",
+"The night sky filled with shining stars.",
+"A dragonfly skimmed quickly over the still pond.",
+"A lighthouse shone brightly across the stormy sea.",
+"A campfire crackled warmly under the starry night sky.",
 ]
+
 
 def generate_speech(
     model,
@@ -199,6 +441,7 @@ def generate_speech(
     cosyvoice_model,
     lang=None,
     path2save_audio=None,
+    fout_speech=None,
 ):
     """
     AR model sinh unit -> CosyVoice2.flow (mel) -> CosyVoice2.hift (audio).
@@ -218,6 +461,7 @@ def generate_speech(
 
     # --- chuẩn hoá text
     # text_source = remove_special_characters(text_source)
+    text_source = text_source.lower().replace("-", " ").strip()
 
     # --- tokenize + nối BOS_TTS (KHÔNG hardcode 'cuda:0')
     encoded_inputs = tokenizer(text_source, return_tensors='pt', padding=True, truncation=True).to(device)
@@ -289,7 +533,14 @@ def generate_speech(
             audio = audio.unsqueeze(0)  # [C, T]
         audio = audio.to(torch.float32).clamp_(-1, 1)
         ta.save(path2save_audio, audio, resample_rate)
-        print(f"{GREEN}Saved: {path2save_audio}{RESET}")
+        print(f"Saved: {path2save_audio}")
+
+    transcript = transcription_whisper(path2save_audio, language=lang)
+    print(f"{f'{RED}text source (GT)'.ljust(20)}: {remove_special_characters(text_source)}{RESET}")
+    print(f"{f'{GREEN}transcript (ASR)'.ljust(20)}: {remove_special_characters(transcript)}{RESET}")
+    out_file = f"{path2save_audio}\t{remove_special_characters(text_source)}\t{remove_special_characters(transcript)}\n"
+    fout_speech.write(out_file)
+    fout_speech.flush()
 
 def generate_image(model, tokenizer, vq_model, t5_model, text_source, device, configs, path2save_image=None):
     text_tokens_and_mask = tokenizer(
@@ -334,9 +585,11 @@ def generate_image(model, tokenizer, vq_model, t5_model, text_source, device, co
 
 
 def perform_inference(model, tokenizer, vq_model, t5_model, device, frontend, cosyvoice_model, configs, lang=None):
-    path2save_root = os.path.join(configs['training']['output_dir'], "samples")
+    path2save_root = os.path.join(configs['training']['output_dir'], "samples_paper_realistic")
     if not os.path.exists(path2save_root):
         os.makedirs(path2save_root)
+    fout_speech = open(os.path.join(path2save_root, "gen_speech.txt"), "w", encoding="utf-8")
+
     for index, text_source in enumerate(text_sources):
         path2save_audio = os.path.join(path2save_root, f"audio_{index}.wav")
         path2save_image = os.path.join(path2save_root, f"image_{index}.png")
@@ -349,18 +602,19 @@ def perform_inference(model, tokenizer, vq_model, t5_model, device, frontend, co
             frontend=frontend,
             cosyvoice_model=cosyvoice_model,
             lang=lang,
-            path2save_audio=path2save_audio
+            path2save_audio=path2save_audio,
+            fout_speech=fout_speech
         )
-        generate_image(
-            model=model,
-            tokenizer=tokenizer,
-            t5_model=t5_model,
-            vq_model=vq_model,
-            text_source=text_source,
-            device=device,
-            configs=configs,
-            path2save_image=path2save_image
-        )
+        # generate_image(
+        #     model=model,
+        #     tokenizer=tokenizer,
+        #     t5_model=t5_model,
+        #     vq_model=vq_model,
+        #     text_source= f"{image_prefix_promt} {text_source}",
+        #     device=device,
+        #     configs=configs,
+        #     path2save_image=path2save_image
+        # )
 
 def inference(config):
     # 3. Set device
